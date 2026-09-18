@@ -294,9 +294,15 @@ def match_products(
         confidence -= Decimal("25") * len(conflicts)
     if not known:
         confidence -= Decimal("5")
-    if title_similarity < 0.2 and method is not MatchMethod.TITLE:
+    # A low title overlap is only evidence of trouble when the structured
+    # signals do not already corroborate the match. The same article is
+    # routinely titled differently on two marketplaces - and in two
+    # languages - so penalising that on top of an agreeing identifier, brand
+    # and model would manufacture false negatives.
+    corroborated = brand_agrees is True and model_agrees is True
+    if title_similarity < 0.2 and method is not MatchMethod.TITLE and not corroborated:
         confidence -= Decimal("8")
-        evidence["title_similarity"] += " - unusually low for a claimed match"
+        evidence["title_similarity"] += " - unusually low and not corroborated by brand/model"
 
     confidence = max(Decimal("0"), min(confidence, ceiling))
 

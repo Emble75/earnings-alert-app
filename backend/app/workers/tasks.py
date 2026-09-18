@@ -13,7 +13,7 @@ from typing import Any
 from celery import shared_task
 from sqlalchemy import select
 
-from app.core.clock import utcnow
+from app.core.clock import age_seconds
 from app.core.errors import AppError
 from app.core.logging import get_logger
 from app.db.session import session_scope
@@ -312,7 +312,7 @@ def revalidate_orders(limit: int = 25) -> dict[str, Any]:
 
         refreshed = 0
         for order in approvals:
-            age = (utcnow() - order.revalidated_at).total_seconds() if order.revalidated_at else None
+            age = age_seconds(order.revalidated_at)
             if age is None or age > config.max_price_age_seconds:
                 try:
                     service.revalidate(order)

@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.compliance.rules import ComplianceContext
 from app.compliance.service import ComplianceService
-from app.core.clock import utcnow
+from app.core.clock import age_seconds, utcnow
 from app.core.errors import (
     ComplianceBlockedError,
     ConflictError,
@@ -568,7 +568,9 @@ class OrderService:
                 context={"order": order.reference},
             )
         # Approving on stale numbers defeats the point of revalidating.
-        age = (utcnow() - order.revalidated_at).total_seconds() if order.revalidated_at else None
+        # age_seconds() normalises naive timestamps: not every database
+        # returns timezone-aware values for a timestamptz column.
+        age = age_seconds(order.revalidated_at)
         if age is None or age > self.config.max_price_age_seconds:
             self.transition(
                 order,
