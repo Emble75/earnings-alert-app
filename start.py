@@ -14,6 +14,7 @@ list, buy or ship anything. See docs/research-mode.md.
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import os
 import platform
@@ -146,9 +147,9 @@ def ensure_frontend() -> None:
     say(f"  {GREEN}ok{RESET} web interface ready")
 
 
-def backend_environment() -> dict[str, str]:
+def backend_environment(password_override: str | None = None) -> dict[str, str]:
     """Research mode, SQLite, no Redis, no background workers."""
-    password = read_or_create_password()
+    password = read_or_create_password(password_override)
     return {
         "DATABASE_URL": f"sqlite:///{DB_PATH}",
         "ENVIRONMENT": "development",
@@ -187,8 +188,38 @@ def _stored(key: str, generator) -> str:
     return values[key]
 
 
-def read_or_create_password() -> str:
+def read_or_create_password(override: str | None = None) -> str:
+    if override:
+        # Replace whatever was stored, so `--password` is repeatable.
+        _forget("LOGIN_PASSWORD")
+        return _stored("LOGIN_PASSWORD", lambda: override)
     return _stored("LOGIN_PASSWORD", lambda: secrets.token_urlsafe(12))
+
+
+def _forget(key: str) -> None:
+    if not CREDENTIALS_FILE.exists():
+        return
+    kept = [
+        line
+        for line in CREDENTIALS_FILE.read_text(encoding="utf-8").splitlines()
+        if not line.startswith(f"{key}=")
+    ]
+    CREDENTIALS_FILE.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
+
+def show_login() -> int:
+    """Print the saved sign-in details and exit."""
+    if not CREDENTIALS_FILE.exists():
+        print(
+            "No login has been created yet. Run this script once first:\n"
+            "    python3 start.py",
+            file=sys.stderr,
+        )
+        return 1
+    print("\n  Sign in at http://localhost:3000 with:\n")
+    print(f"    email     {BOLD}operator@example.com{RESET}")
+    print(f"    password  {BOLD}{read_or_create_password()}{RESET}\n")
+    return 0
 
 
 def read_or_create_secret() -> str:
@@ -238,6 +269,25 @@ def wait_for(url: str, *, timeout: float, what: str):
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Start the arbitrage platform in research mode.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--password",
+        metavar="TEXT",
+        help="set your own sign-in password instead of a generated one",
+    )
+    parser.add_argument(
+        "--show-login",
+        action="store_true",
+        help="print the saved sign-in details and exit",
+    )
+    args = parser.parse_args()
+
+    if args.show_login:
+        return show_login()
+
     print(f"\n{BOLD}Arbitrage platform - research mode{RESET}")
     print(f"{DIM}Real analysis. Nothing can be listed, bought or shipped.{RESET}")
 
@@ -252,7 +302,7 @@ def main() -> int:
 
     step(4, 4, "Starting")
     check_ports_are_free()
-    env = backend_environment()
+    env = backend_environment(args.password)
     processes = []
     try:
         processes.append(
@@ -292,7 +342,8 @@ def main() -> int:
         print("\n  Sign in with:")
         print(f"    email     {BOLD}{env['BOOTSTRAP_USER_EMAIL']}{RESET}")
         print(f"    password  {BOLD}{env['BOOTSTRAP_USER_PASSWORD']}{RESET}")
-        print(f"\n  {DIM}(also saved in {CREDENTIALS_FILE.name}){RESET}")
+        print(f"\n  {DIM}Lost it? Run:  python3 start.py --show-login{RESET}")
+        print(f"  {DIM}Prefer your own? Run:  python3 start.py --password yourpassword{RESET}")
         print(f"\n  {YELLOW}Research mode is on.{RESET} The system analyses real products but")
         print("  cannot list, buy or ship. Nothing you do here spends money.")
         print("\n  Go to 'Research' in the menu to analyse your own products.")
