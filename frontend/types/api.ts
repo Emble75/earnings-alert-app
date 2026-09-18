@@ -33,6 +33,48 @@ export interface Page<T> {
   offset: number;
 }
 
+export interface ProductSummary {
+  id: number;
+  title: string;
+  brand: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  category: string | null;
+  condition: string;
+  primary_identifier_value: string | null;
+  image_urls: string[];
+}
+
+export interface SourceOfferSummary {
+  id: number;
+  provider: string;
+  title: string;
+  brand: string | null;
+  model: string | null;
+  price: string | null;
+  shipping_cost: string | null;
+  currency: string;
+  stock_status: string;
+  available_quantity: number | null;
+  delivery_min_days: number | null;
+  delivery_max_days: number | null;
+  delivery_speed: string;
+  seller_name: string | null;
+  sold_by_marketplace: boolean;
+  url: string | null;
+}
+
+export interface TargetListingSummary {
+  id: number;
+  provider: string;
+  title: string;
+  price: string | null;
+  shipping_price: string | null;
+  minimum_sale_price: string | null;
+  currency: string;
+  url: string | null;
+}
+
 export interface Opportunity {
   id: number;
   reference: string;
@@ -40,6 +82,7 @@ export interface Opportunity {
   currency: string;
   quantity: number;
   product_id: number | null;
+  product: ProductSummary | null;
   source_price: string | null;
   target_price: string | null;
   total_costs: string | null;
@@ -107,6 +150,8 @@ export interface RiskAssessment {
 }
 
 export interface OpportunityDetail extends Opportunity {
+  source_offer: SourceOfferSummary | null;
+  target_listing: TargetListingSummary | null;
   profit_calculations: ProfitCalculation[];
   risk_assessments: RiskAssessment[];
   staleness: string[];

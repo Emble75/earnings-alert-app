@@ -92,11 +92,20 @@ export default async function OpportunitiesPage({
           />
         ) : (
           <Table
-            head={["Reference", "State", "Source", "Target", "Net profit", "Margin", "ROI", "Risk", "Match", "Freshness", ""]}
+            head={["Product", "State", "Source", "Target", "Net profit", "Margin", "ROI", "Risk", "Match", "Freshness", ""]}
           >
             {page.items.map((item) => (
               <tr key={item.id}>
-                <td className="px-3 py-2 font-medium">{item.reference}</td>
+                <td className="max-w-[18rem] px-3 py-2">
+                  <div className="truncate font-medium" title={item.product?.title ?? undefined}>
+                    {item.product?.title ?? item.reference}
+                  </div>
+                  <div className="numeric truncate text-xs text-ink-muted">
+                    {[item.product?.brand, item.product?.primary_identifier_value]
+                      .filter(Boolean)
+                      .join(" · ") || item.reference}
+                  </div>
+                </td>
                 <td className="px-3 py-2"><StateBadge state={item.state} /></td>
                 <td className="px-3 py-2"><Money value={item.source_price} currency={item.currency} /></td>
                 <td className="px-3 py-2"><Money value={item.target_price} currency={item.currency} /></td>

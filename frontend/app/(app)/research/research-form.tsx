@@ -85,7 +85,14 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
               (item.decision_reasons[0] ? String(item.decision_reasons[0]) : "");
             return (
               <tr key={item.id}>
-                <td className="max-w-[16rem] truncate px-3 py-2 font-medium">{item.reference}</td>
+                <td className="max-w-[16rem] px-3 py-2">
+                  <div className="truncate font-medium" title={item.product?.title ?? undefined}>
+                    {item.product?.title ?? item.reference}
+                  </div>
+                  <div className="numeric truncate text-xs text-ink-muted">
+                    {item.product?.primary_identifier_value ?? item.reference}
+                  </div>
+                </td>
                 <td className="px-3 py-2">
                   <Verdict state={item.state} />
                 </td>

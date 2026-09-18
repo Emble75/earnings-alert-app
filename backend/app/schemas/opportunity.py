@@ -5,8 +5,63 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from app.models.enums import DecisionOutcome, OpportunityState, RiskLevel
+from app.models.enums import (
+    DecisionOutcome,
+    DeliverySpeed,
+    OpportunityState,
+    ProductCondition,
+    RiskLevel,
+    StockStatus,
+)
 from app.schemas.common import ApiModel, DecimalStringMixin
+
+
+class ProductSummary(ApiModel):
+    """Which product this opportunity is actually about."""
+
+    id: int
+    title: str
+    brand: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    category: str | None = None
+    condition: ProductCondition
+    primary_identifier_value: str | None = None
+    image_urls: list = Field(default_factory=list)
+
+
+class SourceOfferSummary(ApiModel, DecimalStringMixin):
+    """What we would buy, and on what terms."""
+
+    id: int
+    provider: str
+    title: str
+    brand: str | None = None
+    model: str | None = None
+    price: Decimal | None = None
+    shipping_cost: Decimal | None = None
+    currency: str
+    stock_status: StockStatus
+    available_quantity: int | None = None
+    delivery_min_days: int | None = None
+    delivery_max_days: int | None = None
+    delivery_speed: DeliverySpeed
+    seller_name: str | None = None
+    sold_by_marketplace: bool = False
+    url: str | None = None
+
+
+class TargetListingSummary(ApiModel, DecimalStringMixin):
+    """What we would sell it as."""
+
+    id: int
+    provider: str
+    title: str
+    price: Decimal | None = None
+    shipping_price: Decimal | None = None
+    minimum_sale_price: Decimal | None = None
+    currency: str
+    url: str | None = None
 
 
 class OpportunityOut(ApiModel, DecimalStringMixin):
@@ -19,6 +74,7 @@ class OpportunityOut(ApiModel, DecimalStringMixin):
     product_id: int | None = None
     source_offer_id: int | None = None
     target_listing_id: int | None = None
+    product: ProductSummary | None = None
 
     source_price: Decimal | None = None
     target_price: Decimal | None = None
@@ -85,6 +141,8 @@ class RiskAssessmentOut(ApiModel):
 
 
 class OpportunityDetailOut(OpportunityOut):
+    source_offer: SourceOfferSummary | None = None
+    target_listing: TargetListingSummary | None = None
     profit_calculations: list[ProfitCalculationOut] = Field(default_factory=list)
     risk_assessments: list[RiskAssessmentOut] = Field(default_factory=list)
     staleness: list[str] = Field(default_factory=list)

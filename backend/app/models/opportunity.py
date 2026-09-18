@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,6 +23,10 @@ from app.models.enums import (
     RiskLevel,
     ScenarioType,
 )
+
+if TYPE_CHECKING:  # imported for typing only; avoids a circular import
+    from app.models.market import SourceOffer, TargetListing
+    from app.models.product import Product
 
 
 class Opportunity(Base, IdMixin, TimestampMixin):
@@ -86,6 +91,19 @@ class Opportunity(Base, IdMixin, TimestampMixin):
     rejected_reason: Mapped[str | None] = mapped_column(Text)
     discovery_source: Mapped[str | None] = mapped_column(String(60))
     notes: Mapped[str | None] = mapped_column(Text)
+
+    # An opportunity that cannot say which product it is about is not much
+    # use to the person deciding on it. foreign_keys is explicit because
+    # target_listings carries a back-reference to opportunities.
+    product: Mapped[Product] = relationship(
+        "Product", lazy="selectin", foreign_keys=[product_id]
+    )
+    source_offer: Mapped[SourceOffer] = relationship(
+        "SourceOffer", lazy="selectin", foreign_keys=[source_offer_id]
+    )
+    target_listing: Mapped[TargetListing] = relationship(
+        "TargetListing", lazy="selectin", foreign_keys=[target_listing_id]
+    )
 
     profit_calculations: Mapped[list[ProfitCalculation]] = relationship(
         back_populates="opportunity", cascade="all, delete-orphan", lazy="selectin"
