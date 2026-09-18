@@ -219,3 +219,37 @@ def test_a_rejection_tells_the_operator_what_to_add(service):
     reason = opportunity.rejected_reason or ""
     assert "brand" in reason and "model" in reason
     assert "analyse it again" in reason
+
+
+# -- skipping sign-in on a local install ------------------------------------
+def test_sign_in_may_be_skipped_only_when_nothing_can_be_spent():
+    """The flag alone is never enough."""
+    from app.core.config import Settings
+
+    # Research mode: permitted.
+    assert Settings(local_no_auth=True, research_mode=True).local_no_auth_permitted is True
+    # Demo mode: permitted.
+    assert Settings(local_no_auth=True, demo_mode=True).local_no_auth_permitted is True
+    # Able to trade: refused, whatever the flag says.
+    live = Settings(
+        local_no_auth=True,
+        research_mode=False,
+        demo_mode=False,
+        simulation_mode=False,
+        amazon_api_base_url="https://example.invalid",
+        amazon_api_key="k",
+        amazon_api_secret="s",
+        ebay_api_base_url="https://example.invalid",
+        ebay_client_id="c",
+        ebay_client_secret="s",
+    )
+    assert live.local_no_auth_permitted is False
+    assert live.auth_required is True
+    # Production: refused.
+    assert (
+        Settings(local_no_auth=True, research_mode=True, environment="production")
+        .local_no_auth_permitted
+        is False
+    )
+    # Not requested: sign-in required.
+    assert Settings(research_mode=True).auth_required is True

@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     bootstrap_user_email: str = "operator@example.com"
     bootstrap_user_password: str = ""
+    #: Skip the sign-in screen for a single-user install on this machine.
+    #: Only honoured for requests arriving from localhost, never in
+    #: production, and never while the system is able to spend money.
+    local_no_auth: bool = False
 
     # -- persistence --------------------------------------------------------
     database_url: str = "postgresql+psycopg://arbitrage:arbitrage@localhost:5432/arbitrage"
@@ -121,6 +125,24 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def auth_required(self) -> bool:
+        return not self.local_no_auth_permitted
+
+    @property
+    def local_no_auth_permitted(self) -> bool:
+        """Whether skipping sign-in is allowed at all.
+
+        Three conditions, all required. The flag alone is not enough: an
+        install that can list, buy or ship must never be reachable without
+        credentials, however it was configured.
+        """
+        if not self.local_no_auth:
+            return False
+        if self.is_production:
+            return False
+        return self.effective_research_mode or self.effective_demo_mode
 
 
 @lru_cache

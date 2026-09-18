@@ -6,8 +6,10 @@ from collections.abc import Generator
 from typing import Annotated
 
 from fastapi import Depends, Header, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AuthenticationError, AuthorizationError
 from app.core.logging import user_id_var
 from app.core.security import decode_access_token
@@ -34,9 +36,40 @@ def get_provider_bundle() -> ProviderBundle:
 Providers = Annotated[ProviderBundle, Depends(get_provider_bundle)]
 
 
+#: Hosts that count as "this machine". A request from anywhere else is not a
+#: single-user local install, whatever the configuration says.
+LOCALHOST = {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
+def _local_user(session: Session) -> User | None:
+    """The account used when sign-in is skipped on a local install."""
+    settings = get_settings()
+    email = settings.bootstrap_user_email.lower()
+    user = session.execute(select(User).where(User.email == email)).scalars().first()
+    if user is not None and user.is_active:
+        return user
+    return session.execute(select(User).where(User.is_active.is_(True))).scalars().first()
+
+
 def get_current_user(
-    session: DbSession, authorization: Annotated[str | None, Header()] = None
+    request: Request,
+    session: DbSession,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> User:
+    settings = get_settings()
+    if settings.local_no_auth_permitted and not authorization:
+        client_host = request.client.host if request.client else ""
+        if client_host in LOCALHOST:
+            user = _local_user(session)
+            if user is None:
+                raise AuthenticationError(
+                    "sign-in is disabled but no operator account exists"
+                )
+            user_id_var.set(user.id)
+            return user
+        raise AuthenticationError(
+            "sign-in is only skipped for requests from this machine"
+        )
     if not authorization or not authorization.lower().startswith("bearer "):
         raise AuthenticationError("missing bearer token")
     payload = decode_access_token(authorization.split(" ", 1)[1].strip())

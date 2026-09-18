@@ -1,19 +1,24 @@
 import { redirect } from "next/navigation";
 
 import { Nav } from "@/components/nav";
-import { api, isAuthenticated } from "@/lib/api";
+import { api, authRequired, isAuthenticated } from "@/lib/api";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!(await isAuthenticated())) redirect("/login");
+  const signInNeeded = await authRequired();
 
   let mode: string | null = null;
   try {
     const health = await api.health();
-    mode = health.demo_mode
-      ? "DEMO MODE - no real transactions"
-      : health.simulation_mode
-        ? "SIMULATION MODE - no real transactions"
-        : null;
+    // Research mode is checked first: it is the strongest statement about
+    // what this install can do, and the one the operator most needs to see.
+    mode = health.research_mode
+      ? "RESEARCH MODE - analysis only, nothing can be listed, bought or shipped"
+      : health.demo_mode
+        ? "DEMO MODE - built-in example products, no real transactions"
+        : health.simulation_mode
+          ? "SIMULATION MODE - real data, nothing committed externally"
+          : null;
   } catch {
     mode = "backend unreachable";
   }
@@ -24,9 +29,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <p className="px-3 text-sm font-semibold">Arbitrage</p>
         <p className="mb-4 px-3 text-xs text-ink-muted">sell-first operations</p>
         <Nav />
-        <form action="/api/auth/logout" method="post" className="mt-6 px-3">
-          <button type="submit" className="text-xs text-ink-muted hover:text-ink">Sign out</button>
-        </form>
+        {signInNeeded && (
+          <form action="/api/auth/logout" method="post" className="mt-6 px-3">
+            <button type="submit" className="text-xs text-ink-muted hover:text-ink">
+              Sign out
+            </button>
+          </form>
+        )}
       </aside>
       <main className="min-w-0 flex-1 space-y-6">
         {mode && (

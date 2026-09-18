@@ -55,6 +55,30 @@ the *data* is real, and removes the write paths so the *actions* are
 impossible. It is never silently downgraded by `DEMO_MODE` or
 `SIMULATION_MODE`.
 
+## No sign-in on a local install
+
+`start.py` skips the sign-in screen: it is a single-user tool on your own
+machine, and a password you have to look up is friction without a benefit.
+
+The backend only honours this when **all three** hold:
+
+1. It was asked to (`LOCAL_NO_AUTH=true`)
+2. The environment is not production
+3. The system cannot spend money - research or demo mode
+
+Anything able to list, buy or ship always requires credentials, whatever the
+flag says, and the server refuses to start on that combination rather than
+quietly ignoring it. Requests from anywhere other than this machine are
+rejected even when it is on.
+
+Want a login anyway:
+
+```bash
+python3 start.py --require-login          # ask for email and password
+python3 start.py --password yourpassword  # set a known one
+python3 start.py --show-login             # print the saved details
+```
+
 ## Analysing your own products - no marketplace account needed
 
 Getting an official product API is the slow part of this business. Amazon's

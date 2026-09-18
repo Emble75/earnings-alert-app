@@ -72,6 +72,18 @@ async def lifespan(app: FastAPI):
         simulation_mode=settings.simulation_mode,
         automation_level=settings.automation_level,
     )
+    if settings.local_no_auth and not settings.local_no_auth_permitted:
+        raise RuntimeError(
+            "LOCAL_NO_AUTH is set but not permitted here: it is refused in "
+            "production, and refused whenever the system can list, buy or ship. "
+            "Turn on RESEARCH_MODE, or remove LOCAL_NO_AUTH."
+        )
+    if settings.local_no_auth_permitted:
+        logger.warning(
+            "sign_in_disabled",
+            reason="single-user local install",
+            note="requests from this machine are treated as the operator",
+        )
     if settings.effective_demo_mode and not settings.demo_mode:
         logger.warning(
             "demo_mode_forced",

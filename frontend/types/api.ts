@@ -298,6 +298,7 @@ export interface Health {
   environment: string;
   demo_mode: boolean;
   research_mode?: boolean;
+  auth_required?: boolean;
   simulation_mode: boolean;
   automation_level: number;
   providers: Record<string, string | boolean>;

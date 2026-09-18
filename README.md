@@ -19,8 +19,10 @@ python3 start.py        # macOS / Linux
 py start.py             # Windows
 ```
 
-It sets everything up, starts both servers, prints a login and opens
-http://localhost:3000. You need [Python 3.11+](https://www.python.org/downloads/)
+It sets everything up, starts both servers and opens http://localhost:3000.
+No sign-in: it is a single-user tool on your machine. (`--require-login` adds
+one; the backend refuses to skip sign-in in production or whenever the system
+can actually spend money.) You need [Python 3.11+](https://www.python.org/downloads/)
 and [Node.js 20+](https://nodejs.org/) installed; the script checks and tells
 you if either is missing.
 
@@ -165,7 +167,7 @@ FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL 16 · Redis · Celery · Pydant
 ./scripts/check.sh
 ```
 
-Current state: **174 backend tests pass**, ruff clean, `alembic check` reports
+Current state: **175 backend tests pass**, ruff clean, `alembic check` reports
 no drift against PostgreSQL 16, frontend typecheck and lint clean, production
 build succeeds, and all 14 console pages render against a live backend.
 

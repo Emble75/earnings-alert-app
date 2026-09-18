@@ -147,8 +147,15 @@ def ensure_frontend() -> None:
     say(f"  {GREEN}ok{RESET} web interface ready")
 
 
-def backend_environment(password_override: str | None = None) -> dict[str, str]:
-    """Research mode, SQLite, no Redis, no background workers."""
+def backend_environment(
+    password_override: str | None = None, *, require_login: bool = False
+) -> dict[str, str]:
+    """Research mode, SQLite, no Redis, no background workers.
+
+    Sign-in is skipped by default: this is a single-user tool bound to this
+    machine that cannot spend money. The backend refuses to skip it in
+    production or whenever it *can* spend money, whatever is set here.
+    """
     password = read_or_create_password(password_override)
     return {
         "DATABASE_URL": f"sqlite:///{DB_PATH}",
@@ -163,6 +170,7 @@ def backend_environment(password_override: str | None = None) -> dict[str, str]:
         "CORS_ORIGINS": f"http://localhost:{FRONTEND_PORT}",
         "BOOTSTRAP_USER_EMAIL": "operator@example.com",
         "BOOTSTRAP_USER_PASSWORD": password,
+        "LOCAL_NO_AUTH": "false" if require_login else "true",
         "PYTHONUNBUFFERED": "1",
     }
 
@@ -283,6 +291,11 @@ def main() -> int:
         action="store_true",
         help="print the saved sign-in details and exit",
     )
+    parser.add_argument(
+        "--require-login",
+        action="store_true",
+        help="ask for an email and password instead of going straight in",
+    )
     args = parser.parse_args()
 
     if args.show_login:
@@ -302,7 +315,7 @@ def main() -> int:
 
     step(4, 4, "Starting")
     check_ports_are_free()
-    env = backend_environment(args.password)
+    env = backend_environment(args.password, require_login=args.require_login)
     processes = []
     try:
         processes.append(
@@ -339,11 +352,14 @@ def main() -> int:
 
         url = f"http://localhost:{FRONTEND_PORT}"
         print(f"\n{GREEN}{BOLD}Ready.{RESET}  {BOLD}{url}{RESET}")
-        print("\n  Sign in with:")
-        print(f"    email     {BOLD}{env['BOOTSTRAP_USER_EMAIL']}{RESET}")
-        print(f"    password  {BOLD}{env['BOOTSTRAP_USER_PASSWORD']}{RESET}")
-        print(f"\n  {DIM}Lost it? Run:  python3 start.py --show-login{RESET}")
-        print(f"  {DIM}Prefer your own? Run:  python3 start.py --password yourpassword{RESET}")
+        if args.require_login:
+            print("\n  Sign in with:")
+            print(f"    email     {BOLD}{env['BOOTSTRAP_USER_EMAIL']}{RESET}")
+            print(f"    password  {BOLD}{env['BOOTSTRAP_USER_PASSWORD']}{RESET}")
+            print(f"\n  {DIM}Lost it? Run:  python3 start.py --show-login{RESET}")
+        else:
+            print(f"\n  {DIM}No sign-in needed - just open the link above.{RESET}")
+            print(f"  {DIM}Want one? Run:  python3 start.py --require-login{RESET}")
         print(f"\n  {YELLOW}Research mode is on.{RESET} The system analyses real products but")
         print("  cannot list, buy or ship. Nothing you do here spends money.")
         print("\n  Go to 'Research' in the menu to analyse your own products.")

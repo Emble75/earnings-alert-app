@@ -70,9 +70,28 @@ async function authedRequest<T>(path: string, init: RequestInit = {}): Promise<T
   return request<T>(path, init, token);
 }
 
+/**
+ * Whether the console may be used.
+ *
+ * True with a token, and also when the backend reports that sign-in is not
+ * required - a single-user install on this machine, which the backend only
+ * permits while it cannot list, buy or ship.
+ */
 export async function isAuthenticated(): Promise<boolean> {
   const store = await cookies();
-  return Boolean(store.get(TOKEN_COOKIE)?.value);
+  if (store.get(TOKEN_COOKIE)?.value) return true;
+  return !(await authRequired());
+}
+
+export async function authRequired(): Promise<boolean> {
+  try {
+    const health = await api.health();
+    return health.auth_required !== false;
+  } catch {
+    // If the backend cannot be reached, assume sign-in is needed rather than
+    // opening the console.
+    return true;
+  }
 }
 
 export async function login(email: string, password: string): Promise<string> {

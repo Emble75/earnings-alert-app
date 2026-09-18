@@ -33,8 +33,10 @@ def health(providers: Providers) -> dict:
         "status": "ok",
         "environment": settings.environment,
         "demo_mode": settings.effective_demo_mode,
+        "research_mode": settings.effective_research_mode,
         "simulation_mode": settings.simulation_mode,
         "automation_level": settings.automation_level,
+        "auth_required": settings.auth_required,
         "providers": providers.describe(),
         "model_versions": {
             "profit": PROFIT_MODEL_VERSION,

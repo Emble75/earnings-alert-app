@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 
-import { api, isAuthenticated } from "@/lib/api";
+import { api, authRequired, isAuthenticated } from "@/lib/api";
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  // A local install with sign-in disabled has nothing to ask for.
+  if (!(await authRequired())) redirect("/dashboard");
   if (await isAuthenticated()) redirect("/dashboard");
   const { error } = await searchParams;
 
