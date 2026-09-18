@@ -13,6 +13,7 @@ const LINKS: Array<[string, string]> = [
   ["/shipments", "Shipments"],
   ["/returns", "Returns"],
   ["/analytics", "Analytics"],
+  ["/price-history", "Price history"],
   ["/risk", "Risk"],
   ["/settings", "Settings"],
   ["/logs", "Logs"],
