@@ -12,6 +12,26 @@ input has been re-checked against live data.
 
 ## Quick start
 
+No Docker, no database server, nothing to configure:
+
+```bash
+python3 start.py        # macOS / Linux
+py start.py             # Windows
+```
+
+It sets everything up, starts both servers, prints a login and opens
+http://localhost:3000. You need [Python 3.11+](https://www.python.org/downloads/)
+and [Node.js 20+](https://nodejs.org/) installed; the script checks and tells
+you if either is missing.
+
+This starts in **research mode**: it analyses real products but is
+structurally incapable of listing, buying or shipping anything. Go to
+**Research** in the menu to analyse your own products - no Amazon or eBay
+developer account required. See [docs/research-mode.md](docs/research-mode.md).
+
+<details>
+<summary>With Docker instead (adds PostgreSQL, Redis and background workers)</summary>
+
 ```bash
 cp .env.example .env          # set BOOTSTRAP_USER_PASSWORD
 docker compose up
@@ -20,12 +40,21 @@ docker compose up
 - Console: http://localhost:3000
 - API docs: http://localhost:8000/docs
 
-Demo mode is on by default: no credentials are needed, the demo catalogue is
-served, and **no real listing, purchase or shipment can occur**. Seed it with
+Demo mode is on by default. Seed it with
+`python scripts/seed_demo.py --full-order`.
+</details>
 
-```bash
-python scripts/seed_demo.py --full-order
-```
+## The four modes
+
+| Mode | Data | Can it act? | For |
+| --- | --- | --- | --- |
+| **Research** | Real, including your own entered products | **No** - blocked at three layers | Finding out whether this works for you |
+| Demo | Built-in catalogue | No | Seeing the system run end to end |
+| Simulation | Real | Simulated only | Testing the full workflow before going live |
+| Live | Real | Yes, with one approval per purchase | Trading |
+
+Research mode is the only one that is safe to point at live credentials,
+because it removes the write paths rather than relying on a flag.
 
 ## Why sell-first
 
@@ -76,6 +105,10 @@ blocks and goes to review.
 is recorded as evidence of nothing. Variant, condition and pack-quantity
 disagreements block rather than deduct. Confidence is ceilinged by evidence
 class, so a title-only match cannot reach the 95 default threshold.
+
+**Act at all, in research mode.** The providers are wrapped so `purchase`,
+`publish_listing` and `upload_tracking` raise rather than execute; the
+services refuse independently; and compliance blocks it a third time.
 
 **Buy twice after a crash.** Purchases, listings, labels and tracking uploads
 are idempotency-keyed with unique constraints behind them.
@@ -132,7 +165,7 @@ FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL 16 · Redis · Celery · Pydant
 ./scripts/check.sh
 ```
 
-Current state: **153 backend tests pass**, ruff clean, `alembic check` reports
+Current state: **174 backend tests pass**, ruff clean, `alembic check` reports
 no drift against PostgreSQL 16, frontend typecheck and lint clean, production
 build succeeds, and all 14 console pages render against a live backend.
 

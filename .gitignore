@@ -42,3 +42,8 @@ logs/
 # Next.js build output
 frontend/.next/
 frontend/node_modules/
+
+# Local research install
+.venv/
+arbitrage.sqlite3
+.research-login.txt

@@ -36,6 +36,7 @@ from app.models.fulfillment import FulfillmentOrder, Inspection, Shipment, Wareh
 from app.models.opportunity import Opportunity
 from app.models.order import Order, SourceOrder
 from app.models.product import Product
+from app.providers.readonly import ResearchModeError
 from app.providers.registry import ProviderBundle
 from app.services.audit_service import AuditService
 from app.services.opportunity_service import OpportunityService
@@ -272,6 +273,8 @@ class FulfillmentService:
 
     def ship(self, order: Order, *, carrier: str | None = None, service: str | None = None) -> Shipment:
         """Create the outbound shipment and upload tracking. Idempotent."""
+        if self.providers.is_read_only:
+            raise ResearchModeError("shipping to a buyer")
         if order.state is not OrderState.FULFILLMENT:
             raise ConflictError(
                 f"order must be in FULFILLMENT to ship (it is {order.state.value})",
@@ -291,6 +294,7 @@ class FulfillmentService:
                 inspection_passed=inspection is not None and inspection.result is InspectionResult.PASS,
                 carrier=carrier or "DHL",
                 tracking_number=None,
+                research_mode=self.providers.is_read_only,
             ),
             entity_type="order",
             entity_id=order.id,

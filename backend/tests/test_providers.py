@@ -251,3 +251,93 @@ def test_the_guard_does_not_retry_a_non_retryable_error():
     with pytest.raises(ProviderError):
         guard.call("broken", broken)
     assert attempts["count"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Research mode: real data in, nothing out.
+# ---------------------------------------------------------------------------
+def _research_providers():
+    from app.core.config import Settings
+
+    return build_providers(Settings(research_mode=True))
+
+
+def test_research_mode_is_reported_as_read_only():
+    bundle = _research_providers()
+    assert bundle.execution_mode is ExecutionMode.RESEARCH
+    assert bundle.is_read_only is True
+    assert bundle.describe()["read_only"] is True
+
+
+def test_research_mode_still_reads_market_data():
+    """The whole point: real analysis needs real reads."""
+    bundle = _research_providers()
+    assert len(bundle.source.search("")) > 0
+    assert bundle.source.get_offer("AMZ-B09XS7JWHH") is not None
+    assert bundle.target.get_market_stats(identifier="4548736134584").competitor_count > 0
+    assert bundle.source.health()["read_only"] is True
+
+
+def test_research_mode_cannot_purchase():
+    from app.providers.readonly import ResearchModeError
+
+    bundle = _research_providers()
+    with pytest.raises(ResearchModeError):
+        bundle.source.purchase(
+            PurchaseRequest(
+                offer_external_id="AMZ-B09XS7JWHH",
+                quantity=1,
+                max_unit_price=Money("10000.00"),
+                idempotency_key="research-attempt",
+            )
+        )
+
+
+def test_research_mode_cannot_list_update_end_or_upload_tracking():
+    from app.providers.base import PublishRequest
+    from app.providers.readonly import ResearchModeError
+
+    bundle = _research_providers()
+    with pytest.raises(ResearchModeError):
+        bundle.target.publish_listing(
+            PublishRequest(
+                sku="X", title="t", description="d", price=Money("10.00"),
+                quantity=1, condition=ProductCondition.NEW, idempotency_key="k",
+            )
+        )
+    with pytest.raises(ResearchModeError):
+        bundle.target.update_listing("X", price=Money("1.00"))
+    with pytest.raises(ResearchModeError):
+        bundle.target.end_listing("X")
+    with pytest.raises(ResearchModeError):
+        bundle.target.upload_tracking("X", carrier="DHL", tracking_number="1", idempotency_key="k")
+
+
+def test_research_mode_uses_live_data_when_credentials_exist():
+    """Research mode is the one mode that may point at live credentials."""
+    from app.core.config import Settings
+
+    settings = Settings(
+        research_mode=True,
+        amazon_api_base_url="https://example.invalid",
+        amazon_api_key="k",
+        amazon_api_secret="s",
+        ebay_api_base_url="https://example.invalid",
+        ebay_client_id="c",
+        ebay_client_secret="s",
+    )
+    bundle = build_providers(settings)
+    assert bundle.execution_mode is ExecutionMode.RESEARCH
+    assert bundle.is_read_only is True
+    # The real adapters are wrapped, so the data is live but the writes are gone.
+    assert "amazon" in bundle.source.name
+    assert bundle.describe()["demo_mode"] is False
+
+
+def test_research_mode_beats_every_other_mode():
+    """It must not be downgraded by demo or simulation settings."""
+    from app.core.config import Settings
+
+    for demo, simulation in ((True, True), (True, False), (False, True), (False, False)):
+        settings = Settings(research_mode=True, demo_mode=demo, simulation_mode=simulation)
+        assert build_providers(settings).execution_mode is ExecutionMode.RESEARCH

@@ -2,6 +2,7 @@
 
 | Document | What it covers |
 | --- | --- |
+| [research-mode.md](research-mode.md) | **Start here.** Analysing real products safely, with no marketplace account |
 | [architecture.md](architecture.md) | The shape of the system, its design commitments, and its known limitations |
 | [profit-engine.md](profit-engine.md) | The profit formula, fee models, scenarios, and why there is no labour cost |
 | [risk-engine.md](risk-engine.md) | The twelve deterministic factors, weights, blockers and explanations |

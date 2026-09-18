@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS: Array<[string, string]> = [
   ["/dashboard", "Dashboard"],
   ["/opportunities", "Opportunities"],
+  ["/research", "Research"],
   ["/products", "Products"],
   ["/listings", "Listings"],
   ["/orders", "Orders"],

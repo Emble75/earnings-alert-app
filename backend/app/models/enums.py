@@ -264,6 +264,9 @@ class ExecutionMode(StrEnum):
     LIVE = "LIVE"
     SIMULATION = "SIMULATION"
     DEMO = "DEMO"
+    #: Real market data, analysis only. Every write path - listing, purchase,
+    #: shipping, refunds - is disabled at the provider and the service layer.
+    RESEARCH = "RESEARCH"
 
 
 class ScenarioType(StrEnum):

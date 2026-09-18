@@ -1,0 +1,295 @@
+#!/usr/bin/env python3
+"""One-command start for research mode. No Docker, no database server.
+
+    python3 start.py          (macOS / Linux)
+    py start.py               (Windows)
+
+Sets up everything in a local folder, starts both servers and opens the
+browser. Uses a SQLite file instead of PostgreSQL and needs no Redis, so
+nothing has to be installed beyond Python and Node.
+
+Research mode is forced on: the system analyses real products but cannot
+list, buy or ship anything. See docs/research-mode.md.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import os
+import platform
+import secrets
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+import webbrowser
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+BACKEND = ROOT / "backend"
+FRONTEND = ROOT / "frontend"
+VENV = ROOT / ".venv"
+DB_PATH = ROOT / "arbitrage.sqlite3"
+CREDENTIALS_FILE = ROOT / ".research-login.txt"
+
+BACKEND_PORT = 8000
+FRONTEND_PORT = 3000
+IS_WINDOWS = platform.system() == "Windows"
+
+GREEN, YELLOW, RED, DIM, BOLD, RESET = (
+    ("\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[1m", "\033[0m")
+    if not IS_WINDOWS or os.environ.get("WT_SESSION")
+    else ("", "", "", "", "", "")
+)
+
+
+def say(message: str) -> None:
+    print(f"{message}", flush=True)
+
+
+def step(number: int, total: int, message: str) -> None:
+    print(f"\n{BOLD}[{number}/{total}]{RESET} {message}", flush=True)
+
+
+def fail(message: str, remedy: str = "") -> None:
+    print(f"\n{RED}Stopped:{RESET} {message}", file=sys.stderr)
+    if remedy:
+        print(f"\n{remedy}\n", file=sys.stderr)
+    sys.exit(1)
+
+
+def venv_bin(name: str) -> Path:
+    folder = VENV / ("Scripts" if IS_WINDOWS else "bin")
+    return folder / (f"{name}.exe" if IS_WINDOWS else name)
+
+
+def run(command: list[str], *, cwd: Path, quiet: bool = True, env: dict | None = None) -> None:
+    result = subprocess.run(  # noqa: S603 - fixed command lists, no shell
+        command,
+        cwd=cwd,
+        check=False,
+        env={**os.environ, **(env or {})},
+        stdout=subprocess.DEVNULL if quiet else None,
+        stderr=subprocess.PIPE if quiet else None,
+        text=True,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip()
+        fail(
+            f"`{' '.join(command[:3])} ...` failed",
+            detail[-1500:] if detail else "Re-run with the output shown to see why.",
+        )
+
+
+def check_prerequisites() -> None:
+    # Deliberately kept: this script must still run on an older interpreter in
+    # order to tell the user which version they need. noqa: UP036
+    if sys.version_info < (3, 11):  # noqa: UP036
+        fail(
+            f"Python 3.11 or newer is required (you have {sys.version.split()[0]}).",
+            "Install it from https://www.python.org/downloads/ and run this again.",
+        )
+    if shutil.which("node") is None:
+        fail(
+            "Node.js is not installed. The web interface needs it.",
+            "Install the LTS version from https://nodejs.org/ (take the default\n"
+            "options), close and reopen your terminal, then run this again.",
+        )
+    version = subprocess.run(
+        ["node", "--version"], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    try:
+        major = int(version.lstrip("v").split(".")[0])
+    except (ValueError, IndexError):
+        major = 0
+    if major < 20:
+        fail(
+            f"Node.js 20 or newer is required (you have {version}).",
+            "Install the LTS version from https://nodejs.org/ and run this again.",
+        )
+    say(f"  {GREEN}ok{RESET} Python {sys.version.split()[0]}, Node {version}")
+
+
+def ensure_backend() -> None:
+    if not venv_bin("python").exists():
+        say("  creating a private Python environment (one-off)")
+        run([sys.executable, "-m", "venv", str(VENV)], cwd=ROOT)
+    say("  installing backend packages (one-off, can take a minute)")
+    run(
+        [str(venv_bin("python")), "-m", "pip", "install", "--quiet", "--upgrade", "pip"],
+        cwd=ROOT,
+    )
+    run(
+        [
+            str(venv_bin("python")), "-m", "pip", "install", "--quiet",
+            "-r", str(BACKEND / "requirements.txt"),
+        ],
+        cwd=ROOT,
+    )
+    say(f"  {GREEN}ok{RESET} backend ready")
+
+
+def ensure_frontend() -> None:
+    if not (FRONTEND / "node_modules").exists():
+        say("  installing web interface packages (one-off, can take 2-3 minutes)")
+        run(["npm", "install", "--no-audit", "--no-fund"], cwd=FRONTEND)
+    say("  building the web interface (can take a minute)")
+    run(
+        ["npm", "run", "build"],
+        cwd=FRONTEND,
+        env={"NEXT_PUBLIC_API_BASE_URL": f"http://127.0.0.1:{BACKEND_PORT}"},
+    )
+    say(f"  {GREEN}ok{RESET} web interface ready")
+
+
+def backend_environment() -> dict[str, str]:
+    """Research mode, SQLite, no Redis, no background workers."""
+    password = read_or_create_password()
+    return {
+        "DATABASE_URL": f"sqlite:///{DB_PATH}",
+        "ENVIRONMENT": "development",
+        "RESEARCH_MODE": "true",
+        "DEMO_MODE": "true",
+        "SIMULATION_MODE": "true",
+        "AUTOMATION_LEVEL": "1",
+        "LOG_LEVEL": "WARNING",
+        "LOG_FORMAT": "console",
+        "SECRET_KEY": read_or_create_secret(),
+        "CORS_ORIGINS": f"http://localhost:{FRONTEND_PORT}",
+        "BOOTSTRAP_USER_EMAIL": "operator@example.com",
+        "BOOTSTRAP_USER_PASSWORD": password,
+        "PYTHONUNBUFFERED": "1",
+    }
+
+
+def _stored(key: str, generator) -> str:
+    """Keep generated secrets stable across restarts, in a git-ignored file."""
+    values: dict[str, str] = {}
+    if CREDENTIALS_FILE.exists():
+        for line in CREDENTIALS_FILE.read_text(encoding="utf-8").splitlines():
+            if "=" in line and not line.startswith("#"):
+                name, _, value = line.partition("=")
+                values[name.strip()] = value.strip()
+    if key not in values:
+        values[key] = generator()
+        CREDENTIALS_FILE.write_text(
+            "# Local research install. Not for production. Safe to delete.\n"
+            + "\n".join(f"{k}={v}" for k, v in values.items())
+            + "\n",
+            encoding="utf-8",
+        )
+        if not IS_WINDOWS:
+            CREDENTIALS_FILE.chmod(0o600)
+    return values[key]
+
+
+def read_or_create_password() -> str:
+    return _stored("LOGIN_PASSWORD", lambda: secrets.token_urlsafe(12))
+
+
+def read_or_create_secret() -> str:
+    return _stored("SECRET_KEY", lambda: secrets.token_urlsafe(48))
+
+
+def wait_for(url: str, *, timeout: float, what: str):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=3):
+                return True
+        except (urllib.error.URLError, OSError):
+            time.sleep(0.5)
+    fail(f"{what} did not start within {int(timeout)} seconds.")
+
+
+def main() -> int:
+    print(f"\n{BOLD}Arbitrage platform - research mode{RESET}")
+    print(f"{DIM}Real analysis. Nothing can be listed, bought or shipped.{RESET}")
+
+    step(1, 4, "Checking what's installed")
+    check_prerequisites()
+
+    step(2, 4, "Setting up the backend")
+    ensure_backend()
+
+    step(3, 4, "Setting up the web interface")
+    ensure_frontend()
+
+    step(4, 4, "Starting")
+    env = backend_environment()
+    processes = []
+    try:
+        processes.append(
+            subprocess.Popen(
+                [
+                    str(venv_bin("python")), "-m", "uvicorn", "app.main:app",
+                    "--host", "127.0.0.1", "--port", str(BACKEND_PORT),
+                ],
+                cwd=BACKEND,
+                env={**os.environ, **env},
+            )
+        )
+        wait_for(
+            f"http://127.0.0.1:{BACKEND_PORT}/api/health", timeout=60, what="The backend"
+        )
+        say(f"  {GREEN}ok{RESET} backend on http://127.0.0.1:{BACKEND_PORT}")
+
+        processes.append(
+            subprocess.Popen(
+                ["npm", "run", "start", "--", "--port", str(FRONTEND_PORT)],
+                cwd=FRONTEND,
+                env={
+                    **os.environ,
+                    "NEXT_PUBLIC_API_BASE_URL": f"http://127.0.0.1:{BACKEND_PORT}",
+                    "NODE_ENV": "production",
+                },
+                stdout=subprocess.DEVNULL,
+            )
+        )
+        wait_for(
+            f"http://127.0.0.1:{FRONTEND_PORT}/login", timeout=90, what="The web interface"
+        )
+        say(f"  {GREEN}ok{RESET} web interface on http://localhost:{FRONTEND_PORT}")
+
+        url = f"http://localhost:{FRONTEND_PORT}"
+        print(f"\n{GREEN}{BOLD}Ready.{RESET}  {BOLD}{url}{RESET}")
+        print("\n  Sign in with:")
+        print(f"    email     {BOLD}{env['BOOTSTRAP_USER_EMAIL']}{RESET}")
+        print(f"    password  {BOLD}{env['BOOTSTRAP_USER_PASSWORD']}{RESET}")
+        print(f"\n  {DIM}(also saved in {CREDENTIALS_FILE.name}){RESET}")
+        print(f"\n  {YELLOW}Research mode is on.{RESET} The system analyses real products but")
+        print("  cannot list, buy or ship. Nothing you do here spends money.")
+        print("\n  Go to 'Research' in the menu to analyse your own products.")
+        print(f"\n{DIM}  Press Ctrl+C to stop.{RESET}\n")
+
+        # Headless or no default browser: the URL is printed above anyway.
+        with contextlib.suppress(OSError, webbrowser.Error):
+            webbrowser.open(url)
+
+        while True:
+            for process in processes:
+                if process.poll() is not None:
+                    fail("One of the servers stopped unexpectedly.")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print(f"\n{DIM}Stopping...{RESET}")
+    finally:
+        for process in processes:
+            if process.poll() is None:
+                try:
+                    if IS_WINDOWS:
+                        process.terminate()
+                    else:
+                        process.send_signal(signal.SIGINT)
+                    process.wait(timeout=10)
+                except (subprocess.TimeoutExpired, OSError):
+                    process.kill()
+        print("Stopped.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

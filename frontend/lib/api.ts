@@ -10,7 +10,8 @@ import { cookies } from "next/headers";
 
 import type {
   Analytics, ApprovalSummary, AuditEntry, Backtest, Health, Listing, Opportunity,
-  OpportunityDetail, Order, OrderDetail, Page, ReturnRecord, SettingsPayload, Shipment,
+  OpportunityDetail, Order, OrderDetail, Page, ResearchResponse, ReturnRecord,
+  SettingsPayload, Shipment,
 } from "@/types/api";
 
 export const API_BASE =
@@ -106,6 +107,43 @@ export const api = {
       `/api/opportunities/${id}/reject?reason=${encodeURIComponent(reason)}`,
       { method: "POST" },
     ),
+
+  researchTemplate: () =>
+    authedRequest<{ columns: Record<string, string[]>; template_csv: string; notes: string[] }>(
+      "/api/research/template",
+    ),
+  research: (products: Record<string, unknown>[]) =>
+    authedRequest<ResearchResponse>("/api/research", {
+      method: "POST",
+      body: JSON.stringify({ products }),
+    }),
+  researchCsv: async (csv: string) => {
+    // Sent as a file upload so the backend applies the same size and encoding
+    // checks it would to a real uploaded file.
+    const { cookies } = await import("next/headers");
+    const token = (await cookies()).get(TOKEN_COOKIE)?.value;
+    const form = new FormData();
+    form.append("file", new Blob([csv], { type: "text/csv" }), "research.csv");
+    const response = await fetch(`${API_BASE}/api/research/csv`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      let message = `${response.status} ${response.statusText}`;
+      let code = "http_error";
+      try {
+        const body = await response.json();
+        message = body?.error?.message ?? message;
+        code = body?.error?.code ?? code;
+      } catch {
+        /* not JSON */
+      }
+      throw new ApiRequestError(message, response.status, code);
+    }
+    return (await response.json()) as ResearchResponse;
+  },
 
   listings: () => authedRequest<Page<Listing>>("/api/listings?own_only=true&limit=100"),
   createListingCandidate: (opportunityId: number) =>

@@ -41,6 +41,7 @@ from app.models.opportunity import Opportunity
 from app.models.product import Product
 from app.profit.engine import ProfitInputs, calculate_profit, inputs_from_config
 from app.providers.base import PublishRequest
+from app.providers.readonly import ResearchModeError
 from app.providers.registry import ProviderBundle
 from app.services.audit_service import AuditService
 from app.services.settings_service import BusinessConfig
@@ -270,6 +271,7 @@ class ListingEngine:
                 and opportunity.match_confidence >= self.config.minimum_match_confidence,
                 handling_time_days=listing.handling_time_days,
                 automation_level=self.config.automation_level,
+                research_mode=self.providers.is_read_only,
             ),
             entity_type="target_listing",
             entity_id=listing.id,
@@ -290,6 +292,9 @@ class ListingEngine:
         price and stock behind this listing may have moved since the candidate
         was created, and a live listing is a promise to supply.
         """
+        if self.providers.is_read_only:
+            raise ResearchModeError("publishing a listing")
+
         from app.services.opportunity_service import OpportunityService
 
         opportunities = OpportunityService(self.session, self.config, self.providers)

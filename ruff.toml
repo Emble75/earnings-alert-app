@@ -1,0 +1,13 @@
+# Lint configuration for the repository-root scripts (start.py, scripts/).
+# The backend has its own pyproject.toml with the same rule selection, so
+# everything in the project is linted consistently.
+line-length = 110
+target-version = "py311"
+extend-exclude = ["backend", "frontend", ".venv", ".venv-dev"]
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "C4", "SIM"]
+ignore = ["B008", "SIM108"]
+
+[lint.isort]
+known-first-party = ["app"]

@@ -144,6 +144,9 @@ class BusinessConfig(BaseModel):
     require_compliance_pass: bool = True
     automation_level: int = 2
     simulation_mode: bool = True
+    research_mode: bool = False
+    """Analysis only. Listing, purchasing and shipping are disabled at the
+    provider layer, in the services and by compliance. Safe against live data."""
     base_currency: str = "EUR"
 
     # -- pricing -------------------------------------------------------------
@@ -225,6 +228,7 @@ FIELD_GROUPS: dict[str, str] = {
     "require_compliance_pass": "policy",
     "automation_level": "automation",
     "simulation_mode": "automation",
+    "research_mode": "automation",
     "base_currency": "general",
     "listing_price_markup_percent": "pricing",
     "price_anomaly_ratio": "pricing",

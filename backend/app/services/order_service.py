@@ -49,6 +49,7 @@ from app.models.product import Product
 from app.profit.engine import ProfitBreakdown, calculate_profit, inputs_from_config
 from app.profit.scenarios import ScenarioSet, build_scenarios
 from app.providers.base import PurchaseRequest, SaleEvent
+from app.providers.readonly import ResearchModeError
 from app.providers.registry import ProviderBundle
 from app.risk.engine import RiskAssessmentResult, risk_reserve_for
 from app.services.audit_service import AuditService
@@ -562,6 +563,8 @@ class OrderService:
 
     def approve(self, order: Order, *, user_id: int | None, note: str = "") -> Order:
         """The single approval. Reserves capital, then unlocks execution."""
+        if self.providers.is_read_only:
+            raise ResearchModeError("approving a source purchase")
         if order.state is not OrderState.APPROVAL_REQUIRED:
             raise ConflictError(
                 f"order must be in APPROVAL_REQUIRED to be approved (it is {order.state.value})",
@@ -619,6 +622,8 @@ class OrderService:
     # -- execution ----------------------------------------------------------
     def execute(self, order: Order) -> SourceOrder:
         """Buy from the source. Idempotent, price-capped, compliance-gated."""
+        if self.providers.is_read_only:
+            raise ResearchModeError("purchasing from the source marketplace")
         if order.state is not OrderState.APPROVED:
             raise ConflictError(
                 f"order must be APPROVED before execution (it is {order.state.value})",
@@ -660,6 +665,7 @@ class OrderService:
                     and order.match_confidence >= self.config.minimum_match_confidence
                 ),
                 automation_level=self.config.automation_level,
+                research_mode=self.providers.is_read_only,
             ),
             entity_type="order",
             entity_id=order.id,

@@ -297,6 +297,7 @@ export interface Health {
   status: string;
   environment: string;
   demo_mode: boolean;
+  research_mode?: boolean;
   simulation_mode: boolean;
   automation_level: number;
   providers: Record<string, string | boolean>;
@@ -305,4 +306,18 @@ export interface Health {
 
 export interface ApiError {
   error: { code: string; message: string; context: Record<string, unknown>; retryable: boolean };
+}
+
+export interface ResearchSummary {
+  analysed: number;
+  actionable: number;
+  rejected: number;
+  blocked: number;
+  errors: string[];
+}
+
+export interface ResearchResponse {
+  summary: ResearchSummary;
+  opportunities: Opportunity[];
+  errors: string[];
 }

@@ -31,6 +31,7 @@ from app.providers.notifications.channels import (
     InAppNotificationProvider,
     TelegramNotificationProvider,
 )
+from app.providers.readonly import ReadOnlySourceProvider, ReadOnlyTargetProvider
 from app.shipping.manual_carrier import ManualShippingProvider
 
 logger = get_logger(__name__)
@@ -49,6 +50,10 @@ class ProviderBundle:
     def is_live(self) -> bool:
         return self.execution_mode is ExecutionMode.LIVE
 
+    @property
+    def is_read_only(self) -> bool:
+        return self.execution_mode is ExecutionMode.RESEARCH
+
     def describe(self) -> dict:
         return {
             "source": self.source.name,
@@ -57,10 +62,15 @@ class ProviderBundle:
             "shipping": getattr(self.shipping, "name", "shipping"),
             "execution_mode": self.execution_mode.value,
             "demo_mode": self.demo_mode,
+            "read_only": self.is_read_only,
         }
 
 
 def _execution_mode(settings: Settings) -> ExecutionMode:
+    # Research mode is checked first: it is the only mode that may run against
+    # live credentials, because it cannot act on them.
+    if settings.effective_research_mode:
+        return ExecutionMode.RESEARCH
     if settings.effective_demo_mode:
         return ExecutionMode.DEMO
     if settings.simulation_mode:
@@ -71,6 +81,46 @@ def _execution_mode(settings: Settings) -> ExecutionMode:
 def build_providers(settings: Settings | None = None, *, currency: str = "EUR") -> ProviderBundle:
     settings = settings or get_settings()
     mode = _execution_mode(settings)
+
+    # In research mode the real adapters are used when credentials exist, so
+    # the data is real; only the write paths are removed.
+    if mode is ExecutionMode.RESEARCH:
+        if settings.amazon_credentials_present:
+            source: SourceProvider = HttpSourceProvider(
+                base_url=settings.amazon_api_base_url,
+                api_key=settings.amazon_api_key,
+                api_secret=settings.amazon_api_secret,
+                currency=currency,
+                marketplace=settings.amazon_marketplace,
+            )
+        else:
+            source = DemoAmazonProvider(currency=currency)
+        if settings.ebay_credentials_present:
+            target: TargetMarketplaceProvider = HttpTargetProvider(
+                base_url=settings.ebay_api_base_url,
+                api_key=settings.ebay_client_id,
+                api_secret=settings.ebay_client_secret,
+                currency=currency,
+                marketplace=settings.ebay_marketplace,
+                webhook_secret=settings.ebay_webhook_secret,
+            )
+        else:
+            target = DemoEbayProvider(currency=currency)
+        logger.info(
+            "research_mode_active",
+            amazon="live" if settings.amazon_credentials_present else "demo",
+            ebay="live" if settings.ebay_credentials_present else "demo",
+        )
+        return ProviderBundle(
+            source=ReadOnlySourceProvider(source),
+            target=ReadOnlyTargetProvider(target),
+            fulfillment=build_fulfillment_provider(FulfillmentMode.MANUAL, currency=currency),
+            shipping=ManualShippingProvider(currency=currency),
+            execution_mode=mode,
+            demo_mode=not (
+                settings.amazon_credentials_present or settings.ebay_credentials_present
+            ),
+        )
 
     if mode is ExecutionMode.LIVE:
         source: SourceProvider = HttpSourceProvider(

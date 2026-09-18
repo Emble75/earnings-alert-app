@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # -- operating modes ----------------------------------------------------
     demo_mode: bool = True
     simulation_mode: bool = True
+    #: Real market data, analysis only. Nothing can be listed, bought or
+    #: shipped. Safe to point at live credentials.
+    research_mode: bool = False
     automation_level: int = Field(default=2, ge=0, le=4)
     base_currency: str = "EUR"
 
@@ -93,6 +96,15 @@ class Settings(BaseSettings):
     @property
     def ebay_credentials_present(self) -> bool:
         return bool(self.ebay_client_id and self.ebay_client_secret and self.ebay_api_base_url)
+
+    @property
+    def effective_research_mode(self) -> bool:
+        """Research mode wins over every other mode.
+
+        It is the only mode that is safe to run against live credentials
+        without a further decision, so it is never silently downgraded.
+        """
+        return self.research_mode
 
     @property
     def effective_demo_mode(self) -> bool:

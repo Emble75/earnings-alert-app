@@ -69,6 +69,8 @@ class ComplianceContext:
     allowed_destination_countries: tuple[str, ...] = ()
     seller_account_active: bool = True
     is_simulated: bool = False
+    #: Research mode: analysis only. Blocks every outward action.
+    research_mode: bool = False
     automation_level: int = 2
     max_automation_without_approval: int = 3
 
@@ -105,8 +107,18 @@ def _combine(results: list[RuleResult]) -> ComplianceResult:
 # ---------------------------------------------------------------------------
 # Rule sets
 # ---------------------------------------------------------------------------
+def _research_block(action: str) -> RuleResult:
+    return RuleResult(
+        "research_mode",
+        DecisionOutcome.BLOCK,
+        f"research mode is active: {action} is disabled, this deployment only analyses",
+    )
+
+
 def check_listing(ctx: ComplianceContext) -> ComplianceResult:
     results: list[RuleResult] = []
+    if ctx.research_mode:
+        return _combine([_research_block("listing")])
 
     if not ctx.title or len(ctx.title.strip()) < 10:
         results.append(
@@ -185,6 +197,8 @@ def check_listing(ctx: ComplianceContext) -> ComplianceResult:
 def check_order(ctx: ComplianceContext) -> ComplianceResult:
     """Run before committing money to a source purchase."""
     results: list[RuleResult] = []
+    if ctx.research_mode:
+        return _combine([_research_block("purchasing")])
 
     if ctx.source_stock_status is StockStatus.OUT_OF_STOCK:
         results.append(
@@ -263,6 +277,8 @@ def check_order(ctx: ComplianceContext) -> ComplianceResult:
 def check_fulfillment(ctx: ComplianceContext) -> ComplianceResult:
     """Run before dispatching to the buyer."""
     results: list[RuleResult] = []
+    if ctx.research_mode:
+        return _combine([_research_block("shipping")])
 
     required = ("name", "street", "postal_code", "city", "country")
     missing = [f for f in required if not ctx.ship_to.get(f)]
