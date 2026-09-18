@@ -71,6 +71,10 @@ class Order(Base, IdMixin, TimestampMixin):
     expected_margin: Mapped[Decimal | None] = mapped_column(Ratio)
     expected_roi: Mapped[Decimal | None] = mapped_column(Ratio)
     capital_required: Mapped[Decimal | None] = mapped_column(MoneyCents)
+    #: The source unit price the approval was calculated from. The purchase
+    #: refuses to pay more than this, so a price move between approval and
+    #: execution fails the order instead of silently eating the margin.
+    approved_source_unit_price: Mapped[Decimal | None] = mapped_column(MoneyCents)
     risk_score: Mapped[int | None] = mapped_column(Integer)
     match_confidence: Mapped[Decimal | None] = mapped_column(Ratio)
 

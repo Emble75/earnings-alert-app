@@ -217,7 +217,7 @@ class OpportunityService:
         if opportunity.state is OpportunityState.DISCOVERED:
             self.transition(opportunity, OpportunityState.MATCH_PENDING, reason="matching")
 
-        match = self._match(offer, listing)
+        match = self.match_offer_to_listing(offer, listing)
         opportunity.match_confidence = match.confidence
         opportunity.match_timestamp = now
         self._persist_match(opportunity, offer, listing, match)
@@ -277,7 +277,7 @@ class OpportunityService:
         base = scenarios.base_case
 
         # 3. Risk ----------------------------------------------------------
-        risk = self._assess(opportunity, offer, listing, match, base, competition)
+        risk = self.assess_risk_for(opportunity, offer, listing, match, base, competition)
         opportunity.risk_score = risk.score
         opportunity.risk_level = risk.level
         opportunity.risk_timestamp = now
@@ -390,7 +390,7 @@ class OpportunityService:
         )
 
     # -- helpers ------------------------------------------------------------
-    def _match(self, offer: SourceOffer, listing: TargetListing) -> MatchResult:
+    def match_offer_to_listing(self, offer: SourceOffer, listing: TargetListing) -> MatchResult:
         source_ids = dict(offer.raw_payload.get("identifiers") or {}) or self._identifiers_from_offer(
             offer
         )
@@ -493,7 +493,7 @@ class OpportunityService:
             inputs = replace(inputs, risk_reserve_override=risk_reserve)
         return build_scenarios(inputs, self.config)
 
-    def _assess(
+    def assess_risk_for(
         self,
         opportunity: Opportunity,
         offer: SourceOffer,
