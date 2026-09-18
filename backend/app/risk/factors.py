@@ -273,11 +273,17 @@ def target_price_risk(i: RiskInputs) -> FactorScore:
             score += 12
             reasons.append("observed price is modestly above the realistic achievable price")
     if i.price_anomaly_ratio is not None and i.price_anomaly_ratio >= i.max_price_anomaly_ratio:
-        score += 40
+        # A gap this large is almost never free money. It is a variant, a
+        # bundle, a used unit, a regional model, a wrong pack size or a stale
+        # observation. Blocking it for review is the whole point of the
+        # false-positive discipline: a weighted deduction would let a 3x
+        # "profit" sail through on the strength of its own size.
         reasons.append(
             f"target/source price ratio {i.price_anomaly_ratio} looks anomalous "
-            f"(threshold {i.max_price_anomaly_ratio}) - likely a variant, bundle or condition difference"
+            f"(threshold {i.max_price_anomaly_ratio}) - likely a variant, bundle, "
+            "condition or regional difference rather than a real margin"
         )
+        return FactorScore("target_price_risk", 100, weight, "; ".join(reasons), True)
     return FactorScore("target_price_risk", _clamp(score), weight, "; ".join(reasons))
 
 

@@ -40,6 +40,12 @@ class SourceOffer(Base, IdMixin, TimestampMixin):
     external_id: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
     url: Mapped[str | None] = mapped_column(Text)
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Brand/model as observed on the *source* listing. Kept separately from
+    #: the canonical product so the matcher compares what each marketplace
+    #: actually says, rather than comparing a product record with itself.
+    brand: Mapped[str | None] = mapped_column(String(160))
+    manufacturer: Mapped[str | None] = mapped_column(String(160))
+    model: Mapped[str | None] = mapped_column(String(160))
     seller_id: Mapped[str | None] = mapped_column(String(80))
     seller_name: Mapped[str | None] = mapped_column(String(160))
     sold_by_marketplace: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -103,6 +109,9 @@ class TargetListing(Base, IdMixin, TimestampMixin):
     sku: Mapped[str | None] = mapped_column(String(80), index=True)
     url: Mapped[str | None] = mapped_column(Text)
     title: Mapped[str] = mapped_column(Text, nullable=False)
+    #: Brand/model as observed on the target marketplace.
+    brand: Mapped[str | None] = mapped_column(String(160))
+    model: Mapped[str | None] = mapped_column(String(160))
     category_id: Mapped[str | None] = mapped_column(String(40))
     condition: Mapped[ProductCondition] = mapped_column(
         StringEnum(ProductCondition), nullable=False, default=ProductCondition.NEW

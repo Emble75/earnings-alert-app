@@ -32,6 +32,8 @@ _EDGES: list[tuple] = [
     (S.MATCH_VERIFIED, S.PRICE_PENDING, "pricing queued"),
     (S.PRICE_PENDING, S.PROFITABLE, "profit and margin thresholds met"),
     (S.PRICE_PENDING, S.REJECTED, "below minimum profit or margin"),
+    (S.PRICE_PENDING, S.BLOCKED, "no usable price on one side"),
+    (S.PROFITABLE, S.BLOCKED, "hard blocker found after pricing"),
     (S.PROFITABLE, S.RISK_REVIEW, "risk scoring"),
     (S.RISK_REVIEW, S.ACTIONABLE, "risk within limit"),
     (S.RISK_REVIEW, S.REJECTED, "risk above maximum"),

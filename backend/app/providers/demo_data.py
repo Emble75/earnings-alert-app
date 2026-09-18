@@ -29,7 +29,7 @@ DEMO_CATALOG: list[dict[str, Any]] = [
         "attributes": {"color": "black", "variant": "standard", "region": "EU"},
         "image_urls": ["https://example.invalid/demo/xm5.jpg"],
         "source": {
-            "price": "228.00",
+            "price": "199.00",
             "shipping": "0.00",
             "stock": "IN_STOCK",
             "quantity": 42,
@@ -66,7 +66,7 @@ DEMO_CATALOG: list[dict[str, Any]] = [
         "attributes": {"color": "stainless steel", "capacity": "1.1 l", "region": "EU"},
         "image_urls": ["https://example.invalid/demo/ec685.jpg"],
         "source": {
-            "price": "159.00",
+            "price": "129.00",
             "shipping": "0.00",
             "stock": "IN_STOCK",
             "quantity": 18,
@@ -370,7 +370,7 @@ DEMO_CATALOG: list[dict[str, Any]] = [
         "attributes": {"size": "27 inch", "variant": "QHD", "color": "silver"},
         "image_urls": [],
         "source": {
-            "price": "279.00",
+            "price": "235.00",
             "shipping": "0.00",
             "stock": "IN_STOCK",
             "quantity": 9,
