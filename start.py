@@ -20,6 +20,7 @@ import platform
 import secrets
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -194,6 +195,37 @@ def read_or_create_secret() -> str:
     return _stored("SECRET_KEY", lambda: secrets.token_urlsafe(48))
 
 
+def port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
+def check_ports_are_free() -> None:
+    """Refuse to start on an occupied port.
+
+    Without this the readiness check below can be satisfied by whatever is
+    already listening - including a previous run of this script - and the
+    script reports success while its own server has quietly failed to bind.
+    """
+    busy = [port for port in (BACKEND_PORT, FRONTEND_PORT) if port_in_use(port)]
+    if not busy:
+        return
+    ports = " and ".join(str(port) for port in busy)
+    verb = "is" if len(busy) == 1 else "are"
+    finder = (
+        f"netstat -ano | findstr :{busy[0]}"
+        if IS_WINDOWS
+        else f"lsof -i :{busy[0]}"
+    )
+    fail(
+        f"Port {ports} {verb} already in use.",
+        "This is usually another copy of this script still running.\n"
+        "Close it (Ctrl+C in its window), then try again.\n\n"
+        f"To see what is using it:\n    {finder}",
+    )
+
+
 def wait_for(url: str, *, timeout: float, what: str):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -219,6 +251,7 @@ def main() -> int:
     ensure_frontend()
 
     step(4, 4, "Starting")
+    check_ports_are_free()
     env = backend_environment()
     processes = []
     try:
@@ -272,7 +305,10 @@ def main() -> int:
         while True:
             for process in processes:
                 if process.poll() is not None:
-                    fail("One of the servers stopped unexpectedly.")
+                    fail(
+                        "One of the servers stopped unexpectedly.",
+                        "The reason is in the output above this message.",
+                    )
             time.sleep(1)
     except KeyboardInterrupt:
         print(f"\n{DIM}Stopping...{RESET}")
