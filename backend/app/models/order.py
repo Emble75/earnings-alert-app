@@ -134,7 +134,9 @@ class OrderEvent(Base, IdMixin):
     actor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     message: Mapped[str | None] = mapped_column(Text)
     payload: Mapped[dict] = mapped_column(JSONDict, nullable=False, default=dict)
-    idempotency_key: Mapped[str | None] = mapped_column(String(80))
+    #: Scoped as "<event_type>:<sha256 hex>", so it needs room for a 64-char
+    #: digest plus the longest event type. 80 was not enough.
+    idempotency_key: Mapped[str | None] = mapped_column(String(160))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
     order: Mapped[Order] = relationship(back_populates="events")

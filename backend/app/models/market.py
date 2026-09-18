@@ -101,8 +101,17 @@ class TargetListing(Base, IdMixin, TimestampMixin):
     )
 
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), index=True)
+    #: Backlink for our own listings. ``opportunities.target_listing_id`` is
+    #: the primary direction; this one is created with ``use_alter`` so the
+    #: two tables do not form a circular dependency at DDL time.
     opportunity_id: Mapped[int | None] = mapped_column(
-        ForeignKey("opportunities.id", ondelete="SET NULL"), index=True
+        ForeignKey(
+            "opportunities.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_target_listings_opportunity_id",
+        ),
+        index=True,
     )
     provider: Mapped[str] = mapped_column(String(40), nullable=False, default="ebay")
     external_id: Mapped[str | None] = mapped_column(String(80), index=True)
