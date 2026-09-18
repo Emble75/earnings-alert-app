@@ -39,6 +39,10 @@ _EDGES: list[tuple] = [
     (S.RISK_REVIEW, S.REJECTED, "risk above maximum"),
     (S.RISK_REVIEW, S.BLOCKED, "hard risk blocker"),
     (S.ACTIONABLE, S.LISTING_CANDIDATE, "listing candidate created"),
+    # Re-evaluation of a settled opportunity re-enters the gates rather than
+    # mutating it in place; the monitors do this on every sweep.
+    (S.ACTIONABLE, S.RISK_REVIEW, "re-evaluated"),
+    (S.LISTING_CANDIDATE, S.RISK_REVIEW, "re-evaluated"),
     (S.ACTIONABLE, S.REVALIDATION_REQUIRED, "data went stale"),
     (S.LISTING_CANDIDATE, S.LISTED, "published on target marketplace", True),
     (S.LISTING_CANDIDATE, S.REVALIDATION_REQUIRED, "data went stale"),

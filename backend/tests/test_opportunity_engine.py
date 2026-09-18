@@ -252,3 +252,25 @@ def test_transitions_are_audited(scenario, service, session):
     assert rows
     assert all(row.occurred_at is not None for row in rows)
     assert any(row.new_state == OpportunityState.ACTIONABLE.value for row in rows)
+
+
+def test_re_evaluating_an_actionable_opportunity_is_allowed(scenario, service):
+    """The monitors re-evaluate settled opportunities on every sweep."""
+    opportunity, *_ = scenario()
+    service.evaluate(opportunity)
+    assert opportunity.state is OpportunityState.ACTIONABLE
+
+    first_profit = opportunity.expected_net_profit
+    service.evaluate(opportunity)
+    assert opportunity.state is OpportunityState.ACTIONABLE
+    assert opportunity.expected_net_profit == first_profit
+
+    # A re-evaluation that finds a blocker must be able to block it.
+    offer = service.session.get(
+        __import__("app.models.market", fromlist=["SourceOffer"]).SourceOffer,
+        opportunity.source_offer_id,
+    )
+    offer.stock_status = StockStatus.OUT_OF_STOCK
+    service.session.flush()
+    service.evaluate(opportunity)
+    assert opportunity.state is OpportunityState.BLOCKED

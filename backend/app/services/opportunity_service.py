@@ -213,6 +213,14 @@ class OpportunityService:
         reasons: list[str] = []
         now = utcnow()
 
+        # 0. Re-entry ------------------------------------------------------
+        # An opportunity that already passed the gates is re-evaluated by the
+        # monitors on every sweep. Returning it to RISK_REVIEW first means the
+        # gates below always run from a consistent state, and the re-check is
+        # visible in the audit trail rather than being an in-place mutation.
+        if opportunity.state in (OpportunityState.ACTIONABLE, OpportunityState.LISTING_CANDIDATE):
+            self.transition(opportunity, OpportunityState.RISK_REVIEW, reason="re-evaluation")
+
         # 1. Matching ------------------------------------------------------
         if opportunity.state is OpportunityState.DISCOVERED:
             self.transition(opportunity, OpportunityState.MATCH_PENDING, reason="matching")
