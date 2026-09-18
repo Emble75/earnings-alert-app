@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: 248 250 252;
+  --surface-raised: 255 255 255;
+  --border: 226 232 240;
+  --ink: 15 23 42;
+  --ink-muted: 100 116 139;
+  --accent: 37 99 235;
+  --positive: 21 128 61;
+  --caution: 180 83 9;
+  --negative: 185 28 28;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: 12 17 28;
+    --surface-raised: 20 27 41;
+    --border: 40 51 70;
+    --ink: 226 232 240;
+    --ink-muted: 148 163 184;
+    --accent: 96 165 250;
+    --positive: 74 222 128;
+    --caution: 251 191 36;
+    --negative: 248 113 113;
+  }
+}
+
+body {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--ink));
+}
+
+/* Money and identifiers line up only in a tabular face. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
