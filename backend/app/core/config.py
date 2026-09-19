@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     ebay_refresh_token: str = ""
     ebay_marketplace: str = "EBAY_DE"
     ebay_webhook_secret: str = ""
+    #: "production" or "sandbox". Sandbox keysets are issued immediately and
+    #: hold almost no inventory; production keysets wait for eBay to verify the
+    #: developer account. The two are not interchangeable.
+    ebay_environment: str = "production"
 
     # -- notifications ------------------------------------------------------
     smtp_host: str = ""
@@ -98,7 +102,24 @@ class Settings(BaseSettings):
         return bool(self.amazon_api_key and self.amazon_api_secret and self.amazon_api_base_url)
 
     @property
+    def ebay_browse_configured(self) -> bool:
+        """Can we *read* live eBay listings?
+
+        An application key pair is all the Browse API needs. It grants public
+        read access and nothing else - it cannot list, sell or see an account -
+        which is why it is enough for research mode but not for selling.
+        """
+        return bool(self.ebay_client_id and self.ebay_client_secret)
+
+    @property
     def ebay_credentials_present(self) -> bool:
+        """Can we *sell* on eBay?
+
+        Deliberately stricter than reading. Listing, revising and uploading
+        tracking are Sell API calls behind a user-consent token, which this
+        system reaches through a gateway. Browse keys alone must never be
+        mistaken for the ability to trade.
+        """
         return bool(self.ebay_client_id and self.ebay_client_secret and self.ebay_api_base_url)
 
     @property

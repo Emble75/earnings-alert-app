@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 
 import { Badge, Card, ExternalLink, Money, Table } from "@/components/ui";
 import { confidence, percent, riskTone } from "@/lib/format";
 
-import { analyseCsv, checkOneProduct, type ResearchActionResult } from "./actions";
+import type { EbayListing, EbaySearchResponse } from "@/types/api";
+
+import { analyseCsv, checkOneProduct, findOnEbay, type ResearchActionResult } from "./actions";
 
 const INITIAL: ResearchActionResult = { ok: false };
 
@@ -44,9 +46,34 @@ export function ResearchForm({ template }: { template: string }) {
   const [ean, setEan] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [targetUrl, setTargetUrl] = useState("");
+  // Controlled, because picking a real eBay listing fills it in.
+  const [targetPrice, setTargetPrice] = useState("");
+
+  const [ebay, setEbay] = useState<EbaySearchResponse | null>(null);
+  const [ebayError, setEbayError] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
 
   const asin = readUrl(sourceUrl, ASIN, "ASIN");
   const item = readUrl(targetUrl, EBAY_ITEM, "Item number");
+
+  function lookUpOnEbay() {
+    setEbayError(null);
+    startSearch(async () => {
+      const result = await findOnEbay({ q: [brand, model].filter(Boolean).join(" "), ean });
+      if (result.ok && result.data) setEbay(result.data);
+      else setEbayError(result.message ?? "the lookup failed");
+    });
+  }
+
+  /** Take a real listing as the eBay side of the comparison. */
+  function useListing(listing: EbayListing) {
+    if (listing.url) setTargetUrl(listing.url);
+    if (listing.price) setTargetPrice(listing.price);
+    // eBay's own product codes are better evidence than anything typed by
+    // hand, so they fill empty fields - but never overwrite what is there.
+    if (!ean && listing.identifiers.EAN) setEan(listing.identifiers.EAN);
+    if (!model && listing.identifiers.MPN) setModel(listing.identifiers.MPN);
+  }
 
   const query = [brand, model].filter(Boolean).join(" ").trim();
   const amazonUrl = ean
@@ -110,8 +137,19 @@ export function ResearchForm({ template }: { template: string }) {
               <span className="text-xs text-ink-muted">Look it up:</span>
               <ExternalLink href={amazonUrl}>Amazon (buy price)</ExternalLink>
               <ExternalLink href={ebaySoldUrl}>eBay — what it sold for</ExternalLink>
+              <button type="button" onClick={lookUpOnEbay} disabled={searching}
+                className="ml-auto text-xs font-medium text-accent hover:underline disabled:opacity-60">
+                {searching ? "Searching eBay..." : "Find the listing on eBay"}
+              </button>
             </div>
           )}
+
+          {ebayError && (
+            <p className="rounded border border-caution/30 bg-caution/10 p-3 text-sm text-caution">
+              {ebayError}
+            </p>
+          )}
+          {ebay && <EbayResults data={ebay} onPick={useListing} />}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -122,7 +160,8 @@ export function ResearchForm({ template }: { template: string }) {
             <div>
               <label htmlFor="target_price" className={LABEL}>eBay sold price *</label>
               <input id="target_price" name="target_price" required inputMode="decimal"
-                placeholder="319.00" className={`${FIELD} numeric`} />
+                placeholder="319.00" className={`${FIELD} numeric`}
+                value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} />
               <p className="mt-1 text-xs text-ink-muted">What it sold for, not asking prices.</p>
             </div>
             <div>
@@ -290,6 +329,61 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
         </Table>
       )}
     </Card>
+  );
+}
+
+function EbayResults({
+  data,
+  onPick,
+}: {
+  data: EbaySearchResponse;
+  onPick: (listing: EbayListing) => void;
+}) {
+  if (!data.available) {
+    return (
+      <div className="rounded border border-border bg-surface p-3 text-sm text-ink-muted">
+        {data.reason}
+      </div>
+    );
+  }
+  if (data.listings.length === 0) {
+    return (
+      <div className="rounded border border-border bg-surface p-3 text-sm text-ink-muted">
+        {data.reason ?? `Nothing on eBay for "${data.query}".`}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded border border-border bg-surface p-3">
+      <p className="mb-2 text-xs text-ink-muted">
+        {data.listings.length} live listing{data.listings.length === 1 ? "" : "s"}. These are
+        asking prices - pick the one you would be competing with, then correct the price to
+        what it actually sells for.
+      </p>
+      <ul className="divide-y divide-border">
+        {data.listings.map((listing) => (
+          <li key={listing.item_id} className="flex items-baseline gap-3 py-2">
+            <span className="numeric w-24 shrink-0 text-sm font-medium">
+              {listing.total ?? listing.price} {listing.currency}
+            </span>
+            <span className="min-w-0 flex-1">
+              <ExternalLink href={listing.url}>
+                <span className="line-clamp-1">{listing.title}</span>
+              </ExternalLink>
+              <span className="mt-0.5 block text-xs text-ink-muted">
+                {listing.condition.toLowerCase().replace("_", " ")} · item {listing.item_id}
+                {listing.seller_feedback ? ` · ${listing.seller_feedback}` : ""}
+                {listing.has_identifier ? " · EAN on file" : ""}
+              </span>
+            </span>
+            <button type="button" onClick={() => onPick(listing)}
+              className="shrink-0 rounded border border-border px-2 py-1 text-xs font-medium hover:border-accent hover:text-accent">
+              Use this one
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

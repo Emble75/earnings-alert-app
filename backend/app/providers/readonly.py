@@ -61,6 +61,21 @@ class ReadOnlySourceProvider(SourceProvider):
         self._inner = inner
         self.name = f"{inner.name}-readonly"
 
+    @property
+    def inner(self) -> SourceProvider:
+        return self._inner
+
+    @property
+    def reads_live_data(self) -> bool:
+        """Whether what comes back is the real marketplace.
+
+        Distinct from :attr:`is_live`, which is always ``False`` here and means
+        "may act". Research mode over real credentials reads live data and can
+        do nothing with it - that is the whole point - so a caller asking "are
+        these real listings?" must not be answered with "can you buy them?".
+        """
+        return bool(getattr(self._inner, "is_live", False))
+
     # -- reads pass straight through ---------------------------------------
     def health(self) -> dict[str, Any]:
         return {**self._inner.health(), "read_only": True}
@@ -96,6 +111,15 @@ class ReadOnlyTargetProvider(TargetMarketplaceProvider):
     def __init__(self, inner: TargetMarketplaceProvider) -> None:
         self._inner = inner
         self.name = f"{inner.name}-readonly"
+
+    @property
+    def inner(self) -> TargetMarketplaceProvider:
+        return self._inner
+
+    @property
+    def reads_live_data(self) -> bool:
+        """See :attr:`ReadOnlySourceProvider.reads_live_data`."""
+        return bool(getattr(self._inner, "is_live", False))
 
     # -- reads --------------------------------------------------------------
     def health(self) -> dict[str, Any]:

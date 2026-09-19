@@ -236,3 +236,61 @@ def test_risk_endpoint_explains_each_assessment(api_client, auth):
     assert risk["risk_model_version"]
     assert risk["recent_assessments"]
     assert risk["recent_assessments"][0]["factors"]
+
+
+def test_the_ebay_lookup_explains_itself_when_no_keys_are_configured(api_client, auth):
+    """"Not configured" is a state the operator can fix, so it is reported as
+    one - not as a 500 that looks like the system is broken."""
+    response = api_client.get("/api/research/ebay?q=sony", headers=auth())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is False
+    assert "EBAY_CLIENT_ID" in body["reason"]
+    assert body["listings"] == []
+
+
+def test_the_ebay_lookup_returns_real_listings_when_keys_exist(api_client, auth, monkeypatch):
+    import httpx
+
+    from app.api import deps
+    from app.providers.ebay.browse import EbayBrowseProvider
+    from app.providers.readonly import ReadOnlyTargetProvider
+    from app.providers.registry import ProviderBundle, get_providers
+    from app.providers.resilience import ProviderGuard, RetryPolicy
+    from tests.test_ebay_browse import SEARCH_RESPONSE, TOKEN_RESPONSE
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "oauth2/token" in request.url.path:
+            return httpx.Response(200, json=TOKEN_RESPONSE)
+        return httpx.Response(200, json=SEARCH_RESPONSE)
+
+    browse = EbayBrowseProvider(
+        client_id="id",
+        client_secret="secret",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        guard=ProviderGuard(provider="ebay-browse", retry=RetryPolicy(attempts=1)),
+    )
+    live = get_providers()
+    bundle = ProviderBundle(
+        source=live.source,
+        target=ReadOnlyTargetProvider(browse),
+        fulfillment=live.fulfillment,
+        shipping=live.shipping,
+        execution_mode=live.execution_mode,
+        demo_mode=False,
+    )
+    api_client.app.dependency_overrides[deps.get_provider_bundle] = lambda: bundle
+    try:
+        response = api_client.get("/api/research/ebay?q=Sony+WH-1000XM5", headers=auth())
+    finally:
+        api_client.app.dependency_overrides.pop(deps.get_provider_bundle, None)
+
+    body = response.json()
+    assert body["available"] is True
+    first = body["listings"][0]
+    # The item number is what makes this one offer rather than a search.
+    assert first["item_id"] == "123456789012"
+    assert first["url"] == "https://www.ebay.de/itm/123456789012"
+    # Money crosses the API as a string, never a float.
+    assert first["price"] == "279.00"
+    assert first["total"] == "283.99"

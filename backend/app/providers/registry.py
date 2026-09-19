@@ -23,6 +23,7 @@ from app.providers.base import (
     SourceProvider,
     TargetMarketplaceProvider,
 )
+from app.providers.ebay.browse import EbayBrowseProvider
 from app.providers.ebay.demo import DemoEbayProvider
 from app.providers.http_gateway import HttpSourceProvider, HttpTargetProvider
 from app.providers.notifications.channels import (
@@ -95,8 +96,19 @@ def build_providers(settings: Settings | None = None, *, currency: str = "EUR") 
             )
         else:
             source = DemoAmazonProvider(currency=currency)
-        if settings.ebay_credentials_present:
-            target: TargetMarketplaceProvider = HttpTargetProvider(
+        # Browse is preferred over the gateway for reading: it addresses one
+        # specific listing by item number and can be searched by GTIN, neither
+        # of which a keyword gateway gives us.
+        if settings.ebay_browse_configured:
+            target: TargetMarketplaceProvider = EbayBrowseProvider(
+                client_id=settings.ebay_client_id,
+                client_secret=settings.ebay_client_secret,
+                currency=currency,
+                marketplace=settings.ebay_marketplace,
+                environment=settings.ebay_environment,
+            )
+        elif settings.ebay_credentials_present:
+            target = HttpTargetProvider(
                 base_url=settings.ebay_api_base_url,
                 api_key=settings.ebay_client_id,
                 api_secret=settings.ebay_client_secret,
@@ -109,7 +121,7 @@ def build_providers(settings: Settings | None = None, *, currency: str = "EUR") 
         logger.info(
             "research_mode_active",
             amazon="live" if settings.amazon_credentials_present else "demo",
-            ebay="live" if settings.ebay_credentials_present else "demo",
+            ebay="live" if settings.ebay_browse_configured else "demo",
         )
         return ProviderBundle(
             source=ReadOnlySourceProvider(source),
@@ -118,7 +130,7 @@ def build_providers(settings: Settings | None = None, *, currency: str = "EUR") 
             shipping=ManualShippingProvider(currency=currency),
             execution_mode=mode,
             demo_mode=not (
-                settings.amazon_credentials_present or settings.ebay_credentials_present
+                settings.amazon_credentials_present or settings.ebay_browse_configured
             ),
         )
 

@@ -114,6 +114,64 @@ the pages they came from.
 Shortened links (`amzn.eu/d/...`, `ebay.us/...`) are reported, not resolved:
 following one would mean fetching the page. Open it and copy the full address.
 
+## Letting eBay find the listing for you
+
+With two eBay application keys the **Find the listing on eBay** button returns
+real listings - title, asking price, shipping, condition, seller feedback and,
+crucially, the item number - and one click fills the eBay side of the form.
+
+### Getting the keys
+
+1. Sign in at [developer.ebay.com](https://developer.ebay.com) and register as
+   a developer. The account has to be verified by eBay before **production**
+   keys are issued; a **sandbox** keyset is available immediately.
+2. Application Keys → create a keyset. Two values matter:
+   **App ID (Client ID)** and **Cert ID (Client Secret)**.
+3. Put them in `.env`:
+
+   ```
+   EBAY_CLIENT_ID=YourApp-Name-PRD-abc123...
+   EBAY_CLIENT_SECRET=PRD-abc123...
+   EBAY_ENVIRONMENT=production      # or sandbox while you are waiting
+   EBAY_MARKETPLACE=EBAY_DE
+   ```
+
+4. Restart. `/api/health` will report the eBay provider as `ebay-browse`.
+
+Sandbox is worth setting up while production is pending, but be clear about
+what it is: an empty shop. It proves the wiring works. It will not find you a
+product to trade, because there is almost nothing listed in it.
+
+### What these keys can and cannot do
+
+They are *application* keys, obtained through the client-credentials grant.
+They carry one scope, public read, and the adapter implements only reads. It
+cannot list, revise, end a listing or upload tracking - those are Sell API
+calls behind a user-consent token from your own seller account, and the
+adapter raises rather than pretending. This is why the keys are safe to
+configure in research mode: the system reads the real eBay and still cannot
+act on it.
+
+### The one thing the API does that the website cannot
+
+Type an EAN into ebay.de and you get nothing. Sellers do not put the number in
+the title, and the site searches titles. The API searches eBay's **structured**
+product field, so `?ean=4548736134584` returns the right listings - and an EAN
+that comes back from eBay's own catalogue is evidence the matcher can use to
+confirm that an Amazon offer and an eBay listing are the same item, rather than
+a similarity score over two titles.
+
+### What is still not automatic
+
+Asking prices are what the Browse API returns. **What buyers actually paid**
+comes from the Marketplace Insights API, which eBay grants per keyset on
+application. Without that grant the system reports sold data as unavailable; it
+does not quietly substitute asking prices, because a number labelled "sold"
+that is really an asking price is worse than no number at all.
+
+The Amazon side has no free equivalent. Its price still has to be entered, or
+pasted as a `/dp/` address.
+
 ### The columns
 
 | Column | Needed | Notes |

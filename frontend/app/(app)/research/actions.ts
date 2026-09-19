@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { ApiRequestError, api } from "@/lib/api";
-import type { ResearchResponse } from "@/types/api";
+import type { EbaySearchResponse, ResearchResponse } from "@/types/api";
 
 export interface ResearchActionResult {
   ok: boolean;
@@ -17,11 +17,32 @@ function refresh() {
   revalidatePath("/dashboard");
 }
 
+function message(error: unknown): string {
+  return error instanceof ApiRequestError ? error.message : "the analysis failed";
+}
+
 function failure(error: unknown): ResearchActionResult {
-  return {
-    ok: false,
-    message: error instanceof ApiRequestError ? error.message : "the analysis failed",
-  };
+  return { ok: false, message: message(error) };
+}
+
+/** Real eBay listings for a product, so one of them can be picked. */
+export async function findOnEbay(input: {
+  q: string;
+  ean: string;
+}): Promise<{ ok: boolean; message?: string; data?: EbaySearchResponse }> {
+  const q = input.q.trim();
+  const ean = input.ean.trim();
+  if (!q && !ean) {
+    return { ok: false, message: "Enter a brand and model, or an EAN." };
+  }
+  try {
+    // An EAN is the precise question, so it is asked first when both are
+    // present. It only works through the API - the eBay website cannot
+    // search by it.
+    return { ok: true, data: await api.searchEbay(ean ? { ean } : { q }) };
+  } catch (error) {
+    return { ok: false, message: message(error) };
+  }
 }
 
 /** Check one product. The common case, so it gets the simplest path. */

@@ -36,6 +36,18 @@ FRONTEND = ROOT / "frontend"
 VENV = ROOT / ".venv"
 DB_PATH = ROOT / "arbitrage.sqlite3"
 CREDENTIALS_FILE = ROOT / ".research-login.txt"
+ENV_FILE = ROOT / ".env"
+
+#: The only settings this launcher takes from .env. Everything else it decides
+#: itself - a DATABASE_URL or a RESEARCH_MODE picked up by accident would
+#: silently change what this install is allowed to do.
+ENV_PASSTHROUGH = (
+    "EBAY_CLIENT_ID",
+    "EBAY_CLIENT_SECRET",
+    "EBAY_ENVIRONMENT",
+    "EBAY_MARKETPLACE",
+    "AMAZON_MARKETPLACE",
+)
 
 BACKEND_PORT = 8000
 FRONTEND_PORT = 3000
@@ -147,6 +159,33 @@ def ensure_frontend() -> None:
     say(f"  {GREEN}ok{RESET} web interface ready")
 
 
+def marketplace_keys() -> dict[str, str]:
+    """Read-only marketplace credentials from .env, if there are any.
+
+    Two eBay application keys turn the eBay side from "type what you see" into
+    real listings with real item numbers. They grant public read access and
+    nothing more, which is why research mode accepts them.
+    """
+    if not ENV_FILE.exists():
+        return {}
+    found: dict[str, str] = {}
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        name = name.strip()
+        value = value.strip().strip("\"'")
+        if name in ENV_PASSTHROUGH and value:
+            found[name] = value
+    # One key without the other cannot authenticate, and half-configured is
+    # the state most likely to look like a bug. Take both or neither.
+    if bool(found.get("EBAY_CLIENT_ID")) != bool(found.get("EBAY_CLIENT_SECRET")):
+        found.pop("EBAY_CLIENT_ID", None)
+        found.pop("EBAY_CLIENT_SECRET", None)
+    return found
+
+
 def backend_environment(
     password_override: str | None = None, *, require_login: bool = False
 ) -> dict[str, str]:
@@ -172,6 +211,7 @@ def backend_environment(
         "BOOTSTRAP_USER_PASSWORD": password,
         "LOCAL_NO_AUTH": "false" if require_login else "true",
         "PYTHONUNBUFFERED": "1",
+        **marketplace_keys(),
     }
 
 
@@ -362,6 +402,13 @@ def main() -> int:
             print(f"  {DIM}Want one? Run:  python3 start.py --require-login{RESET}")
         print(f"\n  {YELLOW}Research mode is on.{RESET} The system analyses real products but")
         print("  cannot list, buy or ship. Nothing you do here spends money.")
+        if env.get("EBAY_CLIENT_ID"):
+            where = env.get("EBAY_ENVIRONMENT", "production")
+            print(f"\n  {GREEN}eBay is connected{RESET} ({where}). 'Find the listing on eBay'")
+            print("  returns real listings with their item numbers.")
+        else:
+            print(f"\n  {DIM}No eBay keys found in .env - the eBay side is typed by hand.{RESET}")
+            print(f"  {DIM}See docs/research-mode.md to connect it.{RESET}")
         print("\n  Go to 'Research' in the menu to analyse your own products.")
         print(f"\n{DIM}  Press Ctrl+C to stop.{RESET}\n")
 

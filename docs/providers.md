@@ -50,9 +50,45 @@ The catalogue is chosen to exercise the filters, not to flatter them:
 `DemoEbayProvider.simulate_sale()` produces a sale event so the full
 sell-first workflow can be exercised without credentials.
 
+## eBay Browse: a real adapter, read-only
+
+`EbayBrowseProvider` speaks eBay's Browse API directly - no gateway. Two
+application keys (`EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`) are all it needs, and
+it is preferred over the generic gateway for reading whenever they are set.
+
+| Method | Endpoint | Note |
+| --- | --- | --- |
+| `search_listings` | `/buy/browse/v1/item_summary/search?q=` | Fixed price only; an auction has no price until it ends |
+| `find_by_identifier` | `…/search?gtin=` | **Works where the website does not** - the API indexes the structured product code |
+| `get_listing_status` | `/buy/browse/v1/item/get_item_by_legacy_id` | Returns the EAN/MPN/EPID that search results omit |
+| `get_market_stats` | derived from a search | Median, never the highest asking price |
+| `sold_prices` | `/buy/marketplace_insights/…` | Restricted API; raises when the keyset is not approved |
+
+What it refuses to do is as important as what it does. `publish_listing`,
+`update_listing`, `end_listing` and `upload_tracking` raise: those are Sell API
+calls behind a user-consent token, and an adapter that appeared to publish
+would be worse than one that cannot. `verify_webhook` always returns `False` -
+Browse sends no notifications, so anything claiming to be one is not ours.
+
+Three further refusals, each of which would otherwise put a guess where the
+engine expects an exact number:
+
+- A listing priced in another currency is **dropped, not converted**. There is
+  no exchange rate in this system, and inventing one would place a guess next
+  to exact money.
+- `realistic_sale_price` is the median of current asking prices. Never the
+  highest: that is one seller's hope, not a sale.
+- Sold prices come only from Marketplace Insights. No fallback to asking
+  prices - a number labelled "sold" that is really an asking price is worse
+  than no number.
+
+Bad credentials fail with `retryable = False`: retrying cannot fix a wrong key,
+and doing so spends the rate limit. The token is cached until a minute before
+expiry, and a mid-session 401 buys exactly one refresh.
+
 ## Live adapters
 
-Amazon's SP-API and eBay's Sell/Browse APIs each have their own auth flow,
+Amazon's SP-API and eBay's Sell APIs each have their own auth flow,
 throttling rules and payload shapes, and neither can be exercised honestly
 without real credentials. Rather than ship untested guesses at those wire
 formats, the live adapters speak one small, stable JSON contract and leave the
@@ -60,6 +96,7 @@ marketplace-specific translation in a single replaceable place.
 
 **This is the remaining integration work, and it is stated plainly rather than
 hidden: pointing `AMAZON_API_BASE_URL` at Amazon directly will not work.**
+Reading eBay is the exception - that adapter is real; see above.
 
 Two ways to go live:
 

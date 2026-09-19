@@ -33,6 +33,28 @@ export interface Page<T> {
   offset: number;
 }
 
+export interface EbayListing {
+  item_id: string;
+  title: string;
+  price: string | null;
+  shipping: string | null;
+  total: string | null;
+  currency: string;
+  condition: string;
+  url: string | null;
+  seller: string | null;
+  seller_feedback: string | null;
+  identifiers: Record<string, string>;
+  has_identifier: boolean;
+}
+
+export interface EbaySearchResponse {
+  available: boolean;
+  reason: string | null;
+  query: string;
+  listings: EbayListing[];
+}
+
 export interface MarketplaceLinks {
   source_product: string | null;
   target_product: string | null;

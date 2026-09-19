@@ -9,8 +9,8 @@
 import { cookies } from "next/headers";
 
 import type {
-  Analytics, ApprovalSummary, AuditEntry, Backtest, Health, Listing, Opportunity,
-  OpportunityDetail, Order, OrderDetail, Page, ResearchResponse, ReturnRecord,
+  Analytics, ApprovalSummary, AuditEntry, Backtest, EbaySearchResponse, Health, Listing,
+  Opportunity, OpportunityDetail, Order, OrderDetail, Page, ResearchResponse, ReturnRecord,
   SettingsPayload, Shipment,
 } from "@/types/api";
 
@@ -126,6 +126,15 @@ export const api = {
       `/api/opportunities/${id}/reject?reason=${encodeURIComponent(reason)}`,
       { method: "POST" },
     ),
+
+  /** Real eBay listings to price against, when eBay keys are configured. */
+  searchEbay: (params: { q?: string; ean?: string; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params.q) query.set("q", params.q);
+    if (params.ean) query.set("ean", params.ean);
+    query.set("limit", String(params.limit ?? 20));
+    return authedRequest<EbaySearchResponse>(`/api/research/ebay?${query.toString()}`);
+  },
 
   researchTemplate: () =>
     authedRequest<{ columns: Record<string, string[]>; template_csv: string; notes: string[] }>(
