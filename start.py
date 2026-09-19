@@ -186,6 +186,52 @@ def marketplace_keys() -> dict[str, str]:
     return found
 
 
+def ensure_database_matches_the_code() -> None:
+    """Rebuild the local database when an update added a column to it.
+
+    The local install creates any table it is missing, but it cannot add a
+    column to a table that already exists - so a database made by an older
+    version fails on the first query that reads a new one. Rather than leave
+    that as a crash to decode, the mismatch is detected here.
+
+    Rebuilding is safe *because of what this file holds*: prices you typed and
+    the analyses derived from them, every one re-enterable and none of it
+    money. The old file is moved aside rather than deleted, so nothing is
+    lost even so.
+    """
+    if not DB_PATH.exists():
+        return
+
+    import sqlite3
+
+    # Each entry is a table and a column that a release added to it. A
+    # database missing any of them predates that release.
+    expected = {"profit_calculations": "net_vat"}
+    missing = []
+    try:
+        with sqlite3.connect(DB_PATH) as db:
+            for table, column in expected.items():
+                rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+                if not rows:
+                    continue  # the table is absent; it will be created
+                if column not in {row[1] for row in rows}:
+                    missing.append(f"{table}.{column}")
+    except sqlite3.DatabaseError:
+        missing.append("unreadable")
+
+    if not missing:
+        return
+
+    backup = DB_PATH.with_suffix(".sqlite3.old")
+    backup.unlink(missing_ok=True)
+    DB_PATH.rename(backup)
+    say(
+        f"  {YELLOW}note{RESET} your database was made by an older version "
+        f"(no {', '.join(missing)})."
+    )
+    say(f"  starting a fresh one. The old file is kept as {backup.name}.")
+
+
 def backend_environment(
     password_override: str | None = None, *, require_login: bool = False
 ) -> dict[str, str]:
@@ -354,6 +400,7 @@ def main() -> int:
     ensure_frontend()
 
     step(4, 4, "Starting")
+    ensure_database_matches_the_code()
     check_ports_are_free()
     env = backend_environment(args.password, require_login=args.require_login)
     processes = []

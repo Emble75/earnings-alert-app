@@ -46,4 +46,5 @@ frontend/node_modules/
 # Local research install
 .venv/
 arbitrage.sqlite3
+arbitrage.sqlite3.old
 .research-login.txt
