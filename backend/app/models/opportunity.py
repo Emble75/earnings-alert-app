@@ -154,6 +154,10 @@ class ProfitCalculation(Base, IdMixin, TimestampMixin):
     expected_return_cost: Mapped[Decimal] = mapped_column(MoneyCents, nullable=False, default=Decimal("0"))
     risk_reserve: Mapped[Decimal] = mapped_column(MoneyCents, nullable=False, default=Decimal("0"))
     other_variable_costs: Mapped[Decimal] = mapped_column(MoneyCents, nullable=False, default=Decimal("0"))
+    #: VAT due on the sale less the input VAT reclaimed. Signed: negative when
+    #: more input tax was deductible than was charged on the sale, which is a
+    #: refund, not a cost. Zero under the small-business scheme.
+    net_vat: Mapped[Decimal] = mapped_column(MoneyCents, nullable=False, default=Decimal("0"))
 
     total_costs: Mapped[Decimal] = mapped_column(MoneyCents, nullable=False, default=Decimal("0"))
     net_profit: Mapped[Decimal] = mapped_column(MoneyCents, nullable=False, default=Decimal("0"))

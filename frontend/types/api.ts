@@ -150,6 +150,7 @@ export interface ProfitCalculation {
   expected_return_cost: string;
   risk_reserve: string;
   other_variable_costs: string;
+  net_vat: string;
   total_costs: string;
   net_profit: string;
   profit_margin: string | null;
@@ -393,8 +394,13 @@ export interface ResearchSummary {
   errors: string[];
 }
 
+/** A checked product, with the arithmetic that produced the verdict. */
+export interface ResearchOpportunity extends Opportunity {
+  profit: ProfitCalculation | null;
+}
+
 export interface ResearchResponse {
   summary: ResearchSummary;
-  opportunities: Opportunity[];
+  opportunities: ResearchOpportunity[];
   errors: string[];
 }

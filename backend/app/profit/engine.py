@@ -22,6 +22,7 @@ from decimal import Decimal
 from app.core.money import Money, quantize_ratio
 from app.models.enums import ScenarioType
 from app.profit.fees import FeeResult, calculate_fees
+from app.profit.vat import VatTreatment
 from app.services.settings_service import BusinessConfig, FeeModel
 
 PROFIT_MODEL_VERSION = "1.0.0"
@@ -57,6 +58,11 @@ class ProfitInputs:
     risk_reserve_percent: Decimal = Decimal("0")
     risk_reserve_override: Money | None = None
 
+    #: How the operator is taxed. The default charges nothing and reclaims
+    #: nothing, which is the small-business case and leaves the arithmetic
+    #: exactly as it was before VAT existed in this model.
+    vat: VatTreatment = field(default_factory=VatTreatment)
+
     scenario: ScenarioType = ScenarioType.BASE_CASE
 
     @property
@@ -88,6 +94,10 @@ class ProfitBreakdown:
     expected_return_cost: Money
     risk_reserve: Money
     other_variable_costs: Money
+    #: VAT due on the sale, less the input VAT reclaimed on the costs. Shown
+    #: as one net line because that is the single figure that leaves the bank
+    #: account; the two halves are in :attr:`vat_lines`.
+    net_vat: Money
 
     total_costs: Money
     net_profit: Money
@@ -96,6 +106,7 @@ class ProfitBreakdown:
     capital_required: Money
 
     fee_lines: list[dict] = field(default_factory=list)
+    vat_lines: list[dict] = field(default_factory=list)
     assumptions: list[str] = field(default_factory=list)
     profit_model_version: str = PROFIT_MODEL_VERSION
     fee_model_version: str = "1.0.0"
@@ -114,6 +125,7 @@ class ProfitBreakdown:
             ("Expected return cost", self.expected_return_cost),
             ("Risk reserve", self.risk_reserve),
             ("Other variable costs", self.other_variable_costs),
+            ("VAT (net of input tax)", self.net_vat),
         ]
 
     def to_dict(self) -> dict:
@@ -133,6 +145,7 @@ class ProfitBreakdown:
             "roi": str(self.roi) if self.roi is not None else None,
             "capital_required": str(self.capital_required.amount),
             "fee_lines": self.fee_lines,
+            "vat_lines": self.vat_lines,
             "assumptions": self.assumptions,
             "profit_model_version": self.profit_model_version,
             "fee_model_version": self.fee_model_version,
@@ -210,6 +223,59 @@ def calculate_profit(inputs: ProfitInputs) -> ProfitBreakdown:
     else:
         payment_fees = Money.zero(currency)
 
+    # -- VAT -----------------------------------------------------------------
+    # The buyer's money is gross. On the standard scheme a fifth of it is the
+    # tax office's, and the VAT inside the costs comes back only where the
+    # operator holds an invoice that allows it. Computed here, before the
+    # return and reserve terms, because it is a cash cost like any other and
+    # the expected-return maths is built on the profit after it.
+    vat = inputs.vat
+    vat_lines: list[dict] = []
+    gross_sale = revenue + buyer_shipping
+    output_vat = vat.vat_in(gross_sale)
+    if output_vat.is_positive():
+        vat_lines.append(
+            {
+                "label": f"VAT due on the sale ({vat.rate}% of the gross price)",
+                "amount": str(output_vat.amount),
+                "base": str(gross_sale.amount),
+            }
+        )
+
+    input_vat = Money.zero(currency)
+    if vat.charges_vat_on_sales:
+        reclaimable = (
+            (vat.reclaim_on_purchase, source_cost + source_shipping, "the purchase"),
+            (vat.reclaim_on_fees, marketplace_fees + payment_fees, "marketplace fees"),
+            (
+                vat.reclaim_on_costs,
+                outbound_shipping + packaging + other,
+                "shipping, packaging and other costs",
+            ),
+        )
+        for allowed, base, label in reclaimable:
+            if not allowed or not base.is_positive():
+                continue
+            reclaimed = vat.vat_in(base)
+            if reclaimed.is_zero():
+                continue
+            input_vat = input_vat + reclaimed
+            vat_lines.append(
+                {
+                    "label": f"input VAT reclaimed on {label}",
+                    "amount": str((-reclaimed).amount),
+                    "base": str(base.amount),
+                }
+            )
+
+    net_vat = output_vat - input_vat
+    if vat.charges_vat_on_sales:
+        assumptions.append(vat.describe())
+        assumptions.append(
+            "VAT is computed as rate/(100+rate) of the gross amount, because the "
+            "prices entered are what is actually paid, not net prices."
+        )
+
     # -- gross profit before return exposure and reserve ---------------------
     gross_costs = (
         source_cost
@@ -220,6 +286,7 @@ def calculate_profit(inputs: ProfitInputs) -> ProfitBreakdown:
         + outbound_shipping
         + packaging
         + other
+        + net_vat
     )
     gross_profit = revenue + buyer_shipping - gross_costs
 
@@ -254,6 +321,12 @@ def calculate_profit(inputs: ProfitInputs) -> ProfitBreakdown:
             f"{recovery} of the goods value recovered, and the outbound shipping, "
             "packaging and return postage written off."
         )
+        if vat.charges_vat_on_sales:
+            assumptions.append(
+                "A returned order is modelled as a full write-off of the unrecovered "
+                "goods, gross of input VAT. Some of that tax is in practice still "
+                "deductible, so the modelled return cost is the pessimistic one."
+            )
     else:
         expected_return_cost = Money.zero(currency)
 
@@ -298,6 +371,7 @@ def calculate_profit(inputs: ProfitInputs) -> ProfitBreakdown:
         packaging_cost=packaging,
         expected_return_cost=expected_return_cost,
         risk_reserve=risk_reserve,
+        net_vat=net_vat,
         other_variable_costs=other,
         total_costs=total_costs,
         net_profit=net_profit,
@@ -305,6 +379,7 @@ def calculate_profit(inputs: ProfitInputs) -> ProfitBreakdown:
         roi=quantize_ratio(roi) if roi is not None else None,
         capital_required=capital_required,
         fee_lines=fee_lines,
+        vat_lines=vat_lines,
         assumptions=assumptions,
         fee_model_version=fee_model_version,
     )
@@ -352,5 +427,6 @@ def inputs_from_config(
         return_shipping_cost=Money(config.return_shipping_cost, currency),
         return_value_recovery_rate=config.return_value_recovery_rate,
         risk_reserve_percent=config.risk_reserve_percent,
+        vat=config.vat_treatment(),
         scenario=scenario,
     )

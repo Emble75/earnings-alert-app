@@ -14,6 +14,7 @@ NET_PROFIT = SALE_REVENUE
            - EXPECTED_RETURN_COST
            - RISK_RESERVE
            - OTHER_ACTUAL_VARIABLE_COSTS
+           - NET_VAT
 ```
 
 Every component is stored and displayed separately. Nothing is netted off
@@ -41,6 +42,62 @@ Total costs:                        €134.99
 Expected net profit:                 €25.00
 Margin:                               15.63%
 ```
+
+## VAT
+
+A profit figure that ignores VAT is wrong for anyone on the standard scheme,
+and wrong by enough to reverse the verdict. Same product, same prices, the
+only difference being the tax position:
+
+| | Net profit | Margin | Verdict |
+| --- | --- | --- | --- |
+| Small business (§19 UStG) | 57.93 | 18.16% | **Worth doing** |
+| Standard scheme, VAT reclaimed on the purchase | 39.34 | 12.33% | **Not worth it** |
+
+*(Sony WH-1000XM5: buy 199.00, sell 319.00, with the default fee model,
+postage, packaging, return exposure and risk reserve.)*
+
+The system does not guess which applies. `vat_scheme` defaults to
+`SMALL_BUSINESS`, which charges nothing and reclaims nothing - the arithmetic
+the engine used before VAT existed in it - so an operator who has never opened
+Settings is never shown a number that silently assumes a tax position they are
+not in.
+
+### How it is computed
+
+VAT contained in a gross amount is `gross x rate / (100 + rate)`. At 19% that
+is 19/119, **not** 19/100: the prices entered are what is actually paid, not
+net prices. Computing it the other way overstates the tax by a fifth, and it
+is the most common way to get this wrong.
+
+Input VAT is deducted only where the operator has ticked it, because the
+reclaim depends on holding an invoice that permits it:
+
+| Setting | When to turn it on |
+| --- | --- |
+| `reclaim_input_vat_on_purchase` | Amazon issues an invoice stating the VAT |
+| `reclaim_input_vat_on_fees` | Your eBay invoices show German VAT (they often do not - reverse charge) |
+| `reclaim_input_vat_on_costs` | Postage and packaging bought with a VAT invoice |
+
+All three default to off. An unticked box costs profit, which is the safe
+direction for a system whose job is to reject false positives - and the
+breakdown says so in as many words rather than leaving it to be discovered.
+
+Two conservatisms, both stated in the breakdown:
+
+- The rate is validated as a percentage. `0.19` and `1.19` are rejected, since
+  no real VAT rate sits between 0 and 3 and both are ways this gets typed
+  wrong - silently, on every order.
+- On a return the goods are written off gross of input VAT. Some of that tax
+  is in practice still deductible, so the modelled return cost is the
+  pessimistic one.
+
+`net_vat` is signed and stored per calculation. It is negative when more input
+tax was deductible than was charged on the sale, which is a refund, and the
+interface shows it as a credit rather than a cost.
+
+**None of this is tax advice.** It is arithmetic applied to an answer the
+operator supplies.
 
 ## No labour cost. At all.
 

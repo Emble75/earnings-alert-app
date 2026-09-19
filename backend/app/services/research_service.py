@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.clock import utcnow
@@ -318,6 +319,30 @@ class ResearchService:
         outcome.errors = errors + outcome.errors
         return outcome
 
+    def _existing(self, model, external_id: str):
+        """The row for this exact offer, if it has been checked before.
+
+        Scoped to the manual-research provider so a hand-entered check can
+        never collide with, or overwrite, something a marketplace adapter
+        fetched.
+        """
+        return self.session.execute(
+            select(model).where(
+                model.provider == "manual-research", model.external_id == external_id
+            )
+        ).scalar_one_or_none()
+
+    @staticmethod
+    def _fill(row, **values) -> None:
+        """Write today's observation onto a row, new or existing.
+
+        Every field is overwritten, deliberately: a re-check is a fresh look
+        at the same offer, so a price that is no longer quoted, or stock that
+        has run out, must replace the old value rather than linger next to it.
+        """
+        for name, value in values.items():
+            setattr(row, name, value)
+
     def _build(self, entry: ResearchInput) -> Opportunity:
         now = utcnow()
         identifiers = {"EAN": entry.ean} if entry.ean else {}
@@ -347,10 +372,21 @@ class ResearchService:
         # same identifiers, so the matcher compares like with like. Without an
         # EAN the match falls back to brand and model, which by design will not
         # reach the 95 threshold - and the analysis says so plainly.
-        offer = SourceOffer(
+        #
+        # An offer identified by its ASIN or item number is *the same offer*
+        # every time it is checked, so re-checking updates it rather than
+        # inserting a second copy: one row per real offer, and the price
+        # history below becomes a series for it. Without an identifier there
+        # is nothing to recognise it by, so each check is a separate record.
+        source_external = f"AMZ-{asin}" if asin else f"MR-{reference('SRC')}"
+        target_external = f"EBAY-{ebay_item_id}" if ebay_item_id else f"MR-{reference('TGT')}"
+
+        offer = self._existing(SourceOffer, source_external) or SourceOffer()
+        self._fill(
+            offer,
             product_id=product.id,
             provider="manual-research",
-            external_id=(f"AMZ-{asin}" if asin else f"MR-{reference('SRC')}"),
+            external_id=source_external,
             title=entry.title,
             brand=entry.brand,
             manufacturer=entry.brand,
@@ -378,10 +414,12 @@ class ResearchService:
                 "domain": source_domain,
             },
         )
-        listing = TargetListing(
+        listing = self._existing(TargetListing, target_external) or TargetListing()
+        self._fill(
+            listing,
             product_id=product.id,
             provider="manual-research",
-            external_id=(f"EBAY-{ebay_item_id}" if ebay_item_id else f"MR-{reference('TGT')}"),
+            external_id=target_external,
             title=entry.title,
             brand=entry.brand,
             model=entry.model,

@@ -15,9 +15,13 @@ from pydantic import Field
 from app.api.deps import BusinessSettings, CurrentUser, Operator, Providers, TxSession
 from app.core.errors import AppError, ValidationError
 from app.core.logging import get_logger
-from app.models.enums import ProductCondition, StockStatus
+from app.models.enums import ProductCondition, ScenarioType, StockStatus
 from app.schemas.common import ApiModel
-from app.schemas.opportunity import MarketplaceLinks, OpportunityOut
+from app.schemas.opportunity import (
+    MarketplaceLinks,
+    OpportunityOut,
+    ProfitCalculationOut,
+)
 from app.services.opportunity_service import build_links
 from app.services.research_service import (
     COLUMNS,
@@ -27,9 +31,31 @@ from app.services.research_service import (
 )
 
 
-def _out(session, opportunity) -> OpportunityOut:
-    out = OpportunityOut.model_validate(opportunity)
+class ResearchOpportunityOut(OpportunityOut):
+    """A checked product, with the arithmetic attached.
+
+    The list endpoints deliberately do not carry the breakdown - it would be
+    weight on every row. Here it is the answer: the operator asked "is this
+    worth doing", and the itemised calculation is what makes the verdict
+    checkable rather than something to be taken on trust.
+    """
+
+    profit: ProfitCalculationOut | None = None
+
+
+def _out(session, opportunity) -> ResearchOpportunityOut:
+    out = ResearchOpportunityOut.model_validate(opportunity)
     out.links = MarketplaceLinks(**build_links(opportunity, session))
+    base = next(
+        (
+            calculation
+            for calculation in opportunity.profit_calculations
+            if calculation.scenario is ScenarioType.BASE_CASE
+        ),
+        None,
+    )
+    if base is not None:
+        out.profit = ProfitCalculationOut.model_validate(base)
     return out
 
 router = APIRouter(prefix="/research", tags=["research"])
@@ -72,7 +98,7 @@ class ResearchRequest(ApiModel):
 
 class ResearchResponse(ApiModel):
     summary: dict
-    opportunities: list[OpportunityOut]
+    opportunities: list[ResearchOpportunityOut]
     errors: list[str] = Field(default_factory=list)
 
 

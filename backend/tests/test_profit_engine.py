@@ -110,6 +110,7 @@ def test_every_cost_component_is_reported_separately():
         "Expected return cost",
         "Risk reserve",
         "Other variable costs",
+        "VAT (net of input tax)",
     ]
     # The components must reconcile to the total exactly.
     total = sum((amount.amount for _, amount in result.cost_lines()), Decimal("0"))

@@ -46,6 +46,11 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
         ["Expected return cost", base.expected_return_cost],
         ["Risk reserve", base.risk_reserve],
         ["Other variable costs", base.other_variable_costs],
+        // Zero under the small-business scheme, where a VAT row would be
+        // noise on every single breakdown.
+        ...(Number(base.net_vat) !== 0
+          ? ([["VAT (net of input tax)", base.net_vat]] as Array<[string, string | null]>)
+          : []),
       ]
     : [];
 

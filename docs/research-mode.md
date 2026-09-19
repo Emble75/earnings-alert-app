@@ -189,6 +189,20 @@ Comma, semicolon and tab separated files all work, as do European numbers
 (`199,00` and `1.319,50`), so an Excel export from a German locale loads
 as-is.
 
+### Set your tax position first
+
+The one setting that changes every number on the page. Under Settings → Vat:
+
+- **Small business (§19 UStG)** - the default. No VAT is deducted.
+- **Standard** - 19% of every sale price goes to the tax office, and the input
+  VAT on the purchase comes back only if you tick the reclaim.
+
+The difference is around a fifth of the margin, which is more than the entire
+20 EUR profit floor on a typical order: the same product reads *worth doing*
+under one scheme and *not worth it* under the other. The research page states
+which one is in force, so you are never reading figures that assume the wrong
+answer. See [profit-engine.md](profit-engine.md#vat).
+
 ### Why a row gets rejected
 
 The same thresholds apply as everywhere else - that is the point. Common ones:

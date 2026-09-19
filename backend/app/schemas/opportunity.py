@@ -132,6 +132,7 @@ class ProfitCalculationOut(ApiModel, DecimalStringMixin):
     expected_return_cost: Decimal
     risk_reserve: Decimal
     other_variable_costs: Decimal
+    net_vat: Decimal
     total_costs: Decimal
     net_profit: Decimal
     profit_margin: Decimal | None = None

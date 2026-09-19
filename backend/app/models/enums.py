@@ -129,6 +129,20 @@ class MatchMethod(StrEnum):
     MANUAL = "MANUAL"
 
 
+class VatScheme(StrEnum):
+    """How the operator is taxed on a sale.
+
+    The two German cases. They differ by about a fifth of the margin, so the
+    system asks rather than assumes - and defaults to the one that changes
+    nothing.
+    """
+
+    #: Kleinunternehmer, §19 UStG. No VAT charged, no input VAT reclaimed.
+    SMALL_BUSINESS = "SMALL_BUSINESS"
+    #: Regelbesteuerung. VAT is due on the sale and input VAT is deductible.
+    STANDARD = "STANDARD"
+
+
 class ProductCondition(StrEnum):
     NEW = "NEW"
     NEW_OTHER = "NEW_OTHER"

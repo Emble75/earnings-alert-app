@@ -598,6 +598,7 @@ class OpportunityService:
                     expected_return_cost=breakdown.expected_return_cost.amount,
                     risk_reserve=breakdown.risk_reserve.amount,
                     other_variable_costs=breakdown.other_variable_costs.amount,
+                    net_vat=breakdown.net_vat.amount,
                     total_costs=breakdown.total_costs.amount,
                     net_profit=breakdown.net_profit.amount,
                     profit_margin=breakdown.profit_margin,

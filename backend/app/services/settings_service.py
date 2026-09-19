@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -19,8 +19,11 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import utcnow
 from app.core.errors import ValidationError
-from app.models.enums import FulfillmentMode
+from app.models.enums import FulfillmentMode, VatScheme
 from app.models.setting import Setting
+
+if TYPE_CHECKING:  # avoids a cycle: the profit engine imports this module
+    from app.profit.vat import VatTreatment
 
 
 class FeeBand(BaseModel):
@@ -123,6 +126,19 @@ class BusinessConfig(BaseModel):
     return_shipping_cost: Decimal = Decimal("5.99")
     other_variable_costs: Decimal = Decimal("0.00")
 
+    # -- VAT -----------------------------------------------------------------
+    # The single biggest correction to a naive margin. A standard-rate seller
+    # keeps 100/119 of the sale price, not all of it. The default is the
+    # small-business case, which changes nothing - so an operator who has not
+    # set this is never shown a figure that silently assumes a tax position.
+    vat_scheme: VatScheme = VatScheme.SMALL_BUSINESS
+    vat_rate_percent: Decimal = Decimal("19")
+    reclaim_input_vat_on_purchase: bool = False
+    """Requires a purchase invoice that states the VAT. Off by default:
+    assuming a reclaim that cannot be made overstates every margin."""
+    reclaim_input_vat_on_fees: bool = False
+    reclaim_input_vat_on_costs: bool = False
+
     # -- risk and returns ----------------------------------------------------
     risk_reserve_percent: Decimal = Decimal("2.5")
     """Percentage of sale revenue held back as a reserve, on top of the
@@ -194,6 +210,32 @@ class BusinessConfig(BaseModel):
             raise ValueError("automation_level must be between 0 and 4")
         return value
 
+    @field_validator("vat_rate_percent")
+    @classmethod
+    def _vat_rate_range(cls, value: Decimal) -> Decimal:
+        if not Decimal("0") <= value <= Decimal("50"):
+            raise ValueError("vat_rate_percent must be a percentage between 0 and 50")
+        # 0.19 (a fraction) and 1.19 (a factor) are the two ways this gets
+        # typed wrong, and both would silently mis-state every order. No real
+        # VAT rate sits in that range, so the range itself is the check.
+        if Decimal("0") < value < Decimal("3"):
+            raise ValueError(
+                f"vat_rate_percent is a percentage: enter 19 for 19%, not {value}"
+            )
+        return value
+
+    def vat_treatment(self) -> VatTreatment:
+        """The tax position, as the profit engine needs it."""
+        from app.profit.vat import VatTreatment
+
+        return VatTreatment(
+            scheme=self.vat_scheme,
+            rate=self.vat_rate_percent,
+            reclaim_on_purchase=self.reclaim_input_vat_on_purchase,
+            reclaim_on_fees=self.reclaim_input_vat_on_fees,
+            reclaim_on_costs=self.reclaim_input_vat_on_costs,
+        )
+
 
 #: Grouping and documentation for the settings UI.
 FIELD_GROUPS: dict[str, str] = {
@@ -216,6 +258,11 @@ FIELD_GROUPS: dict[str, str] = {
     "operator_to_customer_shipping_cost": "fulfillment",
     "return_shipping_cost": "fulfillment",
     "other_variable_costs": "fulfillment",
+    "vat_scheme": "vat",
+    "vat_rate_percent": "vat",
+    "reclaim_input_vat_on_purchase": "vat",
+    "reclaim_input_vat_on_fees": "vat",
+    "reclaim_input_vat_on_costs": "vat",
     "risk_reserve_percent": "risk",
     "expected_return_rate": "risk",
     "return_value_recovery_rate": "risk",
@@ -254,7 +301,7 @@ def _serialize(name: str, value: Any) -> tuple[str, str]:
         return str(value), "decimal"
     if isinstance(value, int):
         return str(value), "int"
-    if isinstance(value, FulfillmentMode):
+    if isinstance(value, FulfillmentMode | VatScheme):
         return value.value, "string"
     return str(value), "string"
 

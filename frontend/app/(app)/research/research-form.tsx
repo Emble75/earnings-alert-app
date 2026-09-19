@@ -6,7 +6,7 @@ import { useActionState, useState, useTransition } from "react";
 import { Badge, Card, ExternalLink, Money, Table } from "@/components/ui";
 import { confidence, percent, riskTone } from "@/lib/format";
 
-import type { EbayListing, EbaySearchResponse } from "@/types/api";
+import type { EbayListing, EbaySearchResponse, ProfitCalculation } from "@/types/api";
 
 import { analyseCsv, checkOneProduct, findOnEbay, type ResearchActionResult } from "./actions";
 
@@ -258,6 +258,7 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
             {why}
           </p>
         )}
+        {single.profit && <Breakdown profit={single.profit} />}
         <div className="mt-4 flex flex-wrap gap-4">
           <ExternalLink href={single.links?.source_product}>Open on Amazon</ExternalLink>
           {single.links?.target_product && (
@@ -383,6 +384,69 @@ function EbayResults({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Every cent, in the order it leaves the account. */
+function Breakdown({ profit }: { profit: ProfitCalculation }) {
+  const rows: Array<[string, string]> = [
+    ["What you buy it for", profit.source_purchase_cost],
+    ["Shipping to you", profit.source_shipping_cost],
+    ["eBay fees", profit.marketplace_fees],
+    ["Payment fees", profit.payment_fees],
+    ["Postage to the buyer", profit.outbound_shipping_cost],
+    ["Packaging", profit.packaging_cost],
+    ["Expected cost of returns", profit.expected_return_cost],
+    ["Risk reserve", profit.risk_reserve],
+    ["Other costs", profit.other_variable_costs],
+    ["VAT, less input tax", profit.net_vat],
+  ];
+  const shown = rows.filter(([, amount]) => Number(amount) !== 0);
+
+  return (
+    <div className="mt-4 rounded border border-border bg-surface p-3">
+      <table className="w-full text-sm">
+        <tbody>
+          <tr>
+            <td className="py-1">Sale price</td>
+            <td className="numeric py-1 text-right font-medium">
+              <Money value={profit.sale_revenue} currency={profit.currency} />
+            </td>
+          </tr>
+          {shown.map(([label, amount]) => {
+            // Costs are subtracted. Net VAT is the one line that can come
+            // back the other way, when more input tax was deductible than
+            // was charged on the sale - so it is shown as the credit it is.
+            const credit = Number(amount) < 0;
+            return (
+              <tr key={label} className="text-ink-muted">
+                <td className="py-1 pl-3">{label}</td>
+                <td className="numeric py-1 text-right">
+                  {credit ? "+" : "−"}
+                  <Money
+                    value={credit ? amount.replace("-", "") : amount}
+                    currency={profit.currency}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+          <tr className="border-t border-border font-medium">
+            <td className="py-1">Left over</td>
+            <td className="numeric py-1 text-right">
+              <Money value={profit.net_profit} currency={profit.currency} signed />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {profit.assumptions.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-border pt-2 text-xs text-ink-muted">
+          {profit.assumptions.map((assumption) => (
+            <li key={String(assumption)}>{String(assumption)}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -447,3 +447,64 @@ def test_amazon_still_uses_the_identifier(service, session):
     links = build_links(opportunity, session)
     assert EAN in links["source_search"]
     assert "Sony+WH-1000XM5" in links["target_sold"]
+
+
+# -- checking the same offer again ------------------------------------------
+def test_the_same_offer_can_be_checked_again(service, session):
+    """The daily case: look at a product today, look again tomorrow.
+
+    A pasted URL makes the offer identifiable, and an identifiable offer is
+    the *same* offer on the second look - so the second check must update it,
+    not collide with it.
+    """
+    from app.models.market import SourceOffer, TargetListing
+
+    def check(source_price: str) -> None:
+        entry = profitable()
+        entry.source_url = "https://www.amazon.de/dp/B09XS7JWHH"
+        entry.target_url = "https://www.ebay.de/itm/123456789012"
+        entry.source_price = Decimal(source_price)
+        outcome = service.analyse([entry])
+        assert outcome.errors == [], outcome.errors
+
+    check("199.00")
+    check("179.00")
+
+    offers = session.query(SourceOffer).filter_by(external_id="AMZ-B09XS7JWHH").all()
+    listings = session.query(TargetListing).filter_by(external_id="EBAY-123456789012").all()
+    # One row per real offer, not one per look at it.
+    assert len(offers) == 1
+    assert len(listings) == 1
+    # Carrying today's price, not yesterday's.
+    assert offers[0].price == Decimal("179.00")
+
+
+def test_re_checking_records_the_price_as_a_new_observation(service, session):
+    """The point of recognising the offer: the prices become a series."""
+    from app.models.market import PriceHistory
+
+    for price in ("199.00", "179.00", "189.00"):
+        entry = profitable()
+        entry.source_url = "https://www.amazon.de/dp/B09XS7JWHH"
+        entry.target_url = "https://www.ebay.de/itm/123456789012"
+        entry.source_price = Decimal(price)
+        service.analyse([entry])
+
+    observed = [
+        row.price
+        for row in session.query(PriceHistory)
+        .filter_by(entity_type="source_offer")
+        .order_by(PriceHistory.id)
+    ]
+    assert observed == [Decimal("199.00"), Decimal("179.00"), Decimal("189.00")]
+
+
+def test_offers_without_an_identifier_stay_separate(service, session):
+    """Nothing to recognise them by, so they must not be merged on a guess."""
+    from app.models.market import SourceOffer
+
+    service.analyse([profitable()])
+    service.analyse([profitable()])
+
+    manual = session.query(SourceOffer).filter(SourceOffer.external_id.like("MR-%")).all()
+    assert len(manual) == 2

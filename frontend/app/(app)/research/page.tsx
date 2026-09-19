@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Card, ErrorNotice, PageHeader } from "@/components/ui";
 import { ApiRequestError, api } from "@/lib/api";
 
@@ -8,10 +10,18 @@ export const dynamic = "force-dynamic";
 export default async function ResearchPage() {
   let template = "";
   let notes: string[] = [];
+  // The tax position silently changes every number on this page, so it is
+  // stated here rather than left to be discovered in Settings.
+  let vatScheme: string | null = null;
   try {
     const payload = await api.researchTemplate();
     template = payload.template_csv;
     notes = payload.notes;
+    try {
+      vatScheme = String((await api.settings()).values.vat_scheme ?? "");
+    } catch {
+      vatScheme = null;
+    }
   } catch (error) {
     return (
       <ErrorNotice
@@ -27,6 +37,19 @@ export default async function ResearchPage() {
         title="Check a product"
         description="Is there money in it? Type the brand, model and EAN, open the two lookup links, enter what you see, and get an answer."
       />
+
+      {vatScheme && (
+        <p className="rounded border border-border bg-surface px-3 py-2 text-xs text-ink-muted">
+          {vatScheme === "STANDARD"
+            ? "VAT is deducted from every sale price below (standard scheme)."
+            : "No VAT is deducted: you are set up as a small business (§19 UStG)."}{" "}
+          <Link href="/settings" className="font-medium text-accent hover:underline">
+            Change
+          </Link>
+          {vatScheme !== "STANDARD" &&
+            " - if you are actually on the standard scheme, every figure here is about a fifth too high."}
+        </p>
+      )}
 
       <Card title="The three numbers that decide it">
         <ol className="list-inside list-decimal space-y-1.5 text-sm text-ink-muted">

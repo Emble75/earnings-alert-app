@@ -4,6 +4,27 @@ import { titleCase } from "@/lib/format";
 
 import { saveSettings } from "./actions";
 
+/** Fields whose value is one of a fixed set, rendered as a menu. */
+const CHOICES: Record<string, Array<[string, string]>> = {
+  vat_scheme: [
+    ["SMALL_BUSINESS", "Small business (§19 UStG) - no VAT on sales"],
+    ["STANDARD", "Standard - VAT due on every sale"],
+  ],
+  fulfillment_mode: [["MANUAL", "Manual (you pack and post)"]],
+};
+
+/** Help for the fields where a wrong answer is silent and expensive. */
+const FIELD_HELP: Record<string, string> = {
+  vat_scheme:
+    "Small business is the default and changes nothing. Standard deducts the VAT from every sale price.",
+  vat_rate_percent: "As a percentage: 19, not 0.19 and not 1.19.",
+  reclaim_input_vat_on_purchase:
+    "Only if Amazon issues you an invoice showing the VAT. Off costs you real margin; on without an invoice overstates every deal.",
+  reclaim_input_vat_on_fees:
+    "eBay usually invoices German business sellers under the reverse charge, in which case there is no input VAT to reclaim. Leave off unless your invoices show German VAT.",
+  reclaim_input_vat_on_costs: "Postage and packaging bought with a VAT invoice.",
+};
+
 export const dynamic = "force-dynamic";
 
 const GROUP_HELP: Record<string, string> = {
@@ -17,6 +38,7 @@ const GROUP_HELP: Record<string, string> = {
   policy: "What to do when information is missing or contradictory.",
   automation: "How much the system may do without asking.",
   pricing: "Listing price behaviour and the anomaly threshold.",
+  vat: "How you are taxed. This is the single largest correction to a naive margin - a standard-rate seller keeps 100/119 of the sale price, not all of it - so an answer here changes every verdict. Not tax advice: set what your accountant says applies to you.",
   fees: "Marketplace and payment fee schedules (JSON).",
   general: "Miscellaneous.",
 };
@@ -64,15 +86,26 @@ export default async function SettingsPage() {
                     <label htmlFor={field} className="text-xs font-medium text-ink-muted">
                       {titleCase(field)}
                     </label>
-                    {isBoolean ? (
+                    {CHOICES[field] ? (
                       <select
                         id={field}
                         name={field}
                         defaultValue={String(value)}
                         className="mt-1 w-full rounded border border-border bg-surface-raised px-3 py-2 text-sm"
                       >
-                        <option value="true">true</option>
-                        <option value="false">false</option>
+                        {CHOICES[field].map(([option, label]) => (
+                          <option key={option} value={option}>{label}</option>
+                        ))}
+                      </select>
+                    ) : isBoolean ? (
+                      <select
+                        id={field}
+                        name={field}
+                        defaultValue={String(value)}
+                        className="mt-1 w-full rounded border border-border bg-surface-raised px-3 py-2 text-sm"
+                      >
+                        <option value="true">yes</option>
+                        <option value="false">no</option>
                       </select>
                     ) : isObject ? (
                       <textarea
@@ -90,6 +123,9 @@ export default async function SettingsPage() {
                         defaultValue={String(value ?? "")}
                         className="numeric mt-1 w-full rounded border border-border bg-surface-raised px-3 py-2 text-sm"
                       />
+                    )}
+                    {FIELD_HELP[field] && (
+                      <p className="mt-1 text-xs text-ink-muted">{FIELD_HELP[field]}</p>
                     )}
                   </div>
                 );
