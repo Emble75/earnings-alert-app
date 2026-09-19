@@ -730,7 +730,13 @@ def build_links(opportunity: Opportunity, session: Session) -> dict[str, str | N
     page, and a generated search is only a substitute for not knowing it.
     """
     from app.core.config import get_settings
-    from app.core.marketplace_links import amazon_url, ebay_search_url, ebay_sold_url
+    from app.core.marketplace_links import (
+        amazon_offer_url,
+        amazon_url,
+        ebay_offer_url,
+        ebay_search_url,
+        ebay_sold_url,
+    )
 
     settings = get_settings()
     product = opportunity.product
@@ -747,25 +753,42 @@ def build_links(opportunity: Opportunity, session: Session) -> dict[str, str | N
             (i.value for i in product.identifiers if i.identifier_type.value == "ASIN"), None
         )
 
+    # An exact offer beats a search every time: it is the listing whose price
+    # was actually used in the calculation.
+    source_domain = (offer.raw_payload or {}).get("domain") if offer else None
+    target_domain = (listing.raw_payload or {}).get("domain") if listing else None
+    ebay_item_id = (listing.raw_payload or {}).get("ebay_item_id") if listing else None
+
+    exact_source = (
+        amazon_offer_url(asin, marketplace=settings.amazon_marketplace, domain=source_domain)
+        if asin
+        else None
+    )
+    exact_target = (
+        ebay_offer_url(ebay_item_id, marketplace=settings.ebay_marketplace, domain=target_domain)
+        if ebay_item_id
+        else None
+    )
+
     generated_source = amazon_url(
         marketplace=settings.amazon_marketplace, asin=asin, identifier=identifier, title=title
     )
     return {
-        "source_product": (offer.url if offer and offer.url else generated_source),
+        "source_product": (
+            exact_source or (offer.url if offer and offer.url else generated_source)
+        ),
+        "target_product": exact_target or (listing.url if listing and listing.url else None),
         "source_search": amazon_url(
             marketplace=settings.amazon_marketplace, identifier=identifier, title=title
         ),
         "target_search": (
-            listing.url
-            if listing and listing.url
-            else ebay_search_url(
+            ebay_search_url(
                 marketplace=settings.ebay_marketplace,
                 identifier=identifier,
                 title=title,
                 brand=brand,
                 model=model,
-            )
-        ),
+        )),
         "target_sold": ebay_sold_url(
             marketplace=settings.ebay_marketplace,
             identifier=identifier,

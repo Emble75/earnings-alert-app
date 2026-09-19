@@ -93,12 +93,26 @@ and will not be given the ability to.**
 So the **Research** page takes the products you have looked up yourself:
 
 1. Find the product on Amazon. Note the price, the EAN (product page →
-   "Product information"), and whether it is in stock.
+   "Product information"), and whether it is in stock. **Copy the address
+   from the browser bar.**
 2. Search that EAN on eBay. Note what comparable items *actually sell for* -
-   completed listings, not the most hopeful asking price.
+   completed listings, not the most hopeful asking price. **Copy the address
+   of the listing you priced against.**
 3. Paste a row per product and analyse.
 
 The engine that runs is the same engine. Only the data collection is manual.
+
+### Paste the two addresses
+
+They are optional, and they change what you get back. With them the result
+links to **those two offers** - `amazon.de/dp/B09XS7JWHH` and
+`ebay.de/itm/123456789012` - rather than to a search that may return something
+else tomorrow. The ASIN and the eBay item number are read out of the address
+and stored with the offer, so the numbers in the calculation stay attached to
+the pages they came from.
+
+Shortened links (`amzn.eu/d/...`, `ebay.us/...`) are reported, not resolved:
+following one would mean fetching the page. Open it and copy the full address.
 
 ### The columns
 

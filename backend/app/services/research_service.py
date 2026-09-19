@@ -29,6 +29,12 @@ from sqlalchemy.orm import Session
 from app.core.clock import utcnow
 from app.core.errors import ValidationError
 from app.core.ids import reference
+from app.core.marketplace_links import (
+    describe_url,
+    extract_asin,
+    extract_ebay_item_id,
+    marketplace_from_url,
+)
 from app.core.money import Money
 from app.models.enums import (
     DeliverySpeed,
@@ -255,6 +261,10 @@ class ResearchService:
     def analyse(self, entries: list[ResearchInput]) -> ResearchOutcome:
         outcome = ResearchOutcome()
         for entry in entries:
+            for url, site in ((entry.source_url, "Amazon"), (entry.target_url, "eBay")):
+                problem = describe_url(url, site=site)
+                if problem:
+                    outcome.errors.append(f"{entry.title[:40]}: {problem}")
             try:
                 opportunity = self._build(entry)
                 outcome.created.append(opportunity)
@@ -312,6 +322,16 @@ class ResearchService:
         now = utcnow()
         identifiers = {"EAN": entry.ean} if entry.ean else {}
 
+        # A pasted URL identifies one specific offer. Keeping the ASIN and the
+        # eBay item id means the links point back at exactly what was priced,
+        # rather than a search that may return something else tomorrow.
+        asin = extract_asin(entry.source_url)
+        if asin:
+            identifiers["ASIN"] = asin
+        ebay_item_id = extract_ebay_item_id(entry.target_url)
+        source_domain = marketplace_from_url(entry.source_url)
+        target_domain = marketplace_from_url(entry.target_url)
+
         product = self.market.upsert_product(
             title=entry.title,
             identifiers=identifiers,
@@ -330,7 +350,7 @@ class ResearchService:
         offer = SourceOffer(
             product_id=product.id,
             provider="manual-research",
-            external_id=f"MR-{reference('SRC')}",
+            external_id=(f"AMZ-{asin}" if asin else f"MR-{reference('SRC')}"),
             title=entry.title,
             brand=entry.brand,
             manufacturer=entry.brand,
@@ -350,12 +370,18 @@ class ResearchService:
             delivery_timestamp=now,
             url=entry.source_url,
             attributes={},
-            raw_payload={"manual": True, "identifiers": identifiers, "notes": entry.notes},
+            raw_payload={
+                "manual": True,
+                "identifiers": identifiers,
+                "notes": entry.notes,
+                "asin": asin,
+                "domain": source_domain,
+            },
         )
         listing = TargetListing(
             product_id=product.id,
             provider="manual-research",
-            external_id=f"MR-{reference('TGT')}",
+            external_id=(f"EBAY-{ebay_item_id}" if ebay_item_id else f"MR-{reference('TGT')}"),
             title=entry.title,
             brand=entry.brand,
             model=entry.model,
@@ -368,7 +394,12 @@ class ResearchService:
             category_id=entry.category,
             url=entry.target_url,
             attributes={},
-            raw_payload={"manual": True, "identifiers": identifiers},
+            raw_payload={
+                "manual": True,
+                "identifiers": identifiers,
+                "ebay_item_id": ebay_item_id,
+                "domain": target_domain,
+            },
         )
         self.session.add_all([offer, listing])
         self.session.flush()

@@ -276,19 +276,116 @@ def test_links_are_generated_from_the_identifier(service, session):
     assert "LH_Complete=1" in links["target_sold"]
 
 
-def test_an_explicit_url_beats_a_generated_one(service, session):
+def test_a_pasted_url_gives_back_the_exact_two_offers(service, session):
+    """The whole point of pasting: the links come back to those offers.
+
+    A search can return something else tomorrow. The ASIN and the eBay item
+    number address the one offer whose price was actually used in the
+    calculation, which is what makes the result checkable.
+    """
     from app.services.opportunity_service import build_links
 
     entry = profitable()
-    entry.source_url = "https://www.amazon.de/dp/B09XS7JWHH"
-    entry.target_url = "https://www.ebay.de/itm/123456789"
+    entry.source_url = "https://www.amazon.de/Sony-WH-1000XM5/dp/B09XS7JWHH/ref=sr_1_1?crid=x"
+    entry.target_url = "https://www.ebay.de/itm/Sony-WH-1000XM5-Schwarz/123456789012?hash=item1"
     opportunity = service.analyse([entry]).created[0]
     links = build_links(opportunity, session)
 
-    assert links["source_product"] == entry.source_url
-    assert links["target_search"] == entry.target_url
-    # The sold search is always generated - it is a search, not a listing.
+    assert links["source_product"] == "https://www.amazon.de/dp/B09XS7JWHH"
+    assert links["target_product"] == "https://www.ebay.de/itm/123456789012"
+    # The searches stay searches: they answer a different question, which is
+    # what *else* is on offer and what the thing has actually sold for.
     assert "LH_Sold=1" in links["target_sold"]
+    assert "/sch/" in links["target_search"]
+
+
+def test_a_pasted_url_stays_on_the_domain_it_came_from(service, session):
+    """A .co.uk offer must not link back to amazon.de at a different price."""
+    from app.services.opportunity_service import build_links
+
+    entry = profitable()
+    entry.source_url = "https://www.amazon.co.uk/dp/B09XS7JWHH"
+    entry.target_url = "https://www.ebay.co.uk/itm/123456789012"
+    links = build_links(service.analyse([entry]).created[0], session)
+
+    assert links["source_product"] == "https://www.amazon.co.uk/dp/B09XS7JWHH"
+    assert links["target_product"] == "https://www.ebay.co.uk/itm/123456789012"
+
+
+def test_without_a_pasted_url_there_is_no_exact_listing(service, session):
+    """No invented item numbers: an unknown listing is reported as unknown."""
+    from app.services.opportunity_service import build_links
+
+    links = build_links(service.analyse([profitable()]).created[0], session)
+    assert links["target_product"] is None
+    assert "/s?k=" in links["source_product"]
+
+
+def test_a_shortened_link_is_reported_rather_than_guessed(service):
+    """Resolving it would mean fetching the page. We ask instead."""
+    entry = profitable()
+    entry.source_url = "https://amzn.eu/d/abc123"
+    outcome = service.analyse([entry])
+
+    assert any("shortened" in error.lower() for error in outcome.errors)
+    # The row is still analysed - only the exact link is missing, not the price.
+    assert len(outcome.evaluations) == 1
+
+
+def test_an_unreadable_link_says_what_is_wrong_with_it(service):
+    entry = profitable()
+    entry.target_url = "https://www.ebay.de/sch/i.html?_nkw=sony"
+    outcome = service.analyse([entry])
+
+    assert any("item number" in error.lower() for error in outcome.errors)
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://www.amazon.de/dp/B09XS7JWHH", "B09XS7JWHH"),
+        ("https://www.amazon.de/Sony-Kopfhörer/dp/B09XS7JWHH/ref=sr_1_1?crid=x", "B09XS7JWHH"),
+        ("https://www.amazon.de/gp/product/B09XS7JWHH?th=1", "B09XS7JWHH"),
+        ("https://www.amazon.de/gp/aw/d/B09XS7JWHH", "B09XS7JWHH"),
+        ("https://www.amazon.de/dp/b09xs7jwhh", None),  # ASINs are upper case
+        ("B09XS7JWHH", "B09XS7JWHH"),                   # pasted on its own
+        ("https://www.amazon.de/s?k=sony", None),       # a search, not an offer
+        ("", None),
+        (None, None),
+    ],
+)
+def test_the_asin_is_read_out_of_whatever_amazon_url_was_pasted(url, expected):
+    from app.core.marketplace_links import extract_asin
+
+    assert extract_asin(url) == expected
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://www.ebay.de/itm/123456789012", "123456789012"),
+        ("https://www.ebay.de/itm/Sony-WH-1000XM5/123456789012?hash=item1", "123456789012"),
+        ("https://www.ebay.de/itm/123456789012?var=987", "123456789012"),
+        ("https://cart.payments.ebay.de/x?item=123456789012", "123456789012"),
+        ("123456789012", "123456789012"),
+        ("https://www.ebay.de/sch/i.html?_nkw=sony", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_the_item_number_is_read_out_of_whatever_ebay_url_was_pasted(url, expected):
+    from app.core.marketplace_links import extract_ebay_item_id
+
+    assert extract_ebay_item_id(url) == expected
+
+
+def test_a_readable_url_produces_no_complaint():
+    from app.core.marketplace_links import describe_url
+
+    assert describe_url("https://www.amazon.de/dp/B09XS7JWHH", site="Amazon") is None
+    assert describe_url("https://www.ebay.de/itm/123456789012", site="eBay") is None
+    assert describe_url(None, site="Amazon") is None
+    assert describe_url("   ", site="eBay") is None
 
 
 def test_links_degrade_to_a_title_search_without_an_identifier(service, session):

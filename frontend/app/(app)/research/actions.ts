@@ -64,6 +64,9 @@ export async function checkOneProduct(
         source_delivery_days: deliveryDays ? Number(deliveryDays) : 2,
         source_shipping: text("source_shipping").replace(",", ".") || "0",
         condition: "NEW",
+        // The exact two offers, when the operator pasted them.
+        source_url: text("source_url") || null,
+        target_url: text("target_url") || null,
       },
     ]);
     refresh();

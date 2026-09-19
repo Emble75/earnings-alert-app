@@ -35,6 +35,7 @@ export interface Page<T> {
 
 export interface MarketplaceLinks {
   source_product: string | null;
+  target_product: string | null;
   source_search: string | null;
   target_search: string | null;
   target_sold: string | null;

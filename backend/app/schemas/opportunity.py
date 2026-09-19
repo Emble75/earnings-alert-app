@@ -19,7 +19,10 @@ from app.schemas.common import ApiModel, DecimalStringMixin
 class MarketplaceLinks(ApiModel):
     """Where to go and check this yourself."""
 
+    #: The exact Amazon offer, when we know its ASIN.
     source_product: str | None = None
+    #: The exact eBay listing, when we know its item number.
+    target_product: str | None = None
     source_search: str | None = None
     target_search: str | None = None
     #: Completed eBay sales - what buyers actually paid, not what sellers ask.

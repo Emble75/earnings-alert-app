@@ -14,6 +14,25 @@ const FIELD =
   "mt-1 w-full rounded border border-border bg-surface-raised px-3 py-2 text-sm";
 const LABEL = "text-xs font-medium text-ink-muted";
 
+// Mirrors the backend extraction, only to give immediate feedback while typing.
+// The backend result is what is stored; this is the echo that tells the
+// operator the address was understood before they spend time on the prices.
+const ASIN = /\/(?:dp|gp\/product|gp\/aw\/d|product)\/([A-Z0-9]{10})(?:[/?#]|$)/;
+const EBAY_ITEM = /\/itm\/(?:[^/?#]*\/)?(\d{9,15})(?:[/?#]|$)/;
+const SHORTENER = /^https?:\/\/(?:www\.)?(?:amzn\.to|amzn\.eu|a\.co|ebay\.us|ebay\.to)\//i;
+
+function readUrl(url: string, pattern: RegExp, label: string) {
+  const value = url.trim();
+  if (!value) return null;
+  if (SHORTENER.test(value)) {
+    return { ok: false, text: "Shortened link - open it and copy the full address." };
+  }
+  const found = value.match(pattern)?.[1];
+  return found
+    ? { ok: true, text: `${label} ${found}` }
+    : { ok: false, text: `No ${label.toLowerCase()} in that address.` };
+}
+
 export function ResearchForm({ template }: { template: string }) {
   const [state, formAction, pending] = useActionState(checkOneProduct, INITIAL);
   const [showBulk, setShowBulk] = useState(false);
@@ -23,6 +42,11 @@ export function ResearchForm({ template }: { template: string }) {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [ean, setEan] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [targetUrl, setTargetUrl] = useState("");
+
+  const asin = readUrl(sourceUrl, ASIN, "ASIN");
+  const item = readUrl(targetUrl, EBAY_ITEM, "Item number");
 
   const query = [brand, model].filter(Boolean).join(" ").trim();
   const amazonUrl = ean
@@ -39,9 +63,30 @@ export function ResearchForm({ template }: { template: string }) {
     <>
       <Card
         title="Check a product"
-        subtitle="Fill in what you see on the two sites. The links below open the right searches for you."
+        subtitle="Paste the two pages you are looking at, fill in the prices, and get a verdict."
       >
         <form action={formAction} className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="source_url" className={LABEL}>Amazon product link</label>
+              <input id="source_url" name="source_url" type="url" spellCheck={false}
+                placeholder="https://www.amazon.de/dp/B09XS7JWHH" className={FIELD}
+                value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} />
+              <Echo result={asin} />
+            </div>
+            <div>
+              <label htmlFor="target_url" className={LABEL}>eBay listing link</label>
+              <input id="target_url" name="target_url" type="url" spellCheck={false}
+                placeholder="https://www.ebay.de/itm/123456789012" className={FIELD}
+                value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} />
+              <Echo result={item} />
+            </div>
+          </div>
+          <p className="text-xs text-ink-muted">
+            Optional, but with them the result links back to those exact two offers
+            instead of a search.
+          </p>
+
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label htmlFor="brand" className={LABEL}>Brand *</label>
@@ -176,6 +221,9 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
         )}
         <div className="mt-4 flex flex-wrap gap-4">
           <ExternalLink href={single.links?.source_product}>Open on Amazon</ExternalLink>
+          {single.links?.target_product && (
+            <ExternalLink href={single.links.target_product}>Open this eBay listing</ExternalLink>
+          )}
           <ExternalLink href={single.links?.target_sold}>eBay sold listings</ExternalLink>
           <Link href={`/opportunities/${single.id}`}
             className="text-xs font-medium text-accent hover:underline">
@@ -228,7 +276,9 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
                 <td className="px-3 py-2">
                   <div className="flex flex-col gap-0.5">
                     <ExternalLink href={item.links?.source_product}>Amazon</ExternalLink>
-                    <ExternalLink href={item.links?.target_sold}>eBay sold</ExternalLink>
+                    <ExternalLink href={item.links?.target_product ?? item.links?.target_sold}>
+                      {item.links?.target_product ? "eBay listing" : "eBay sold"}
+                    </ExternalLink>
                   </div>
                 </td>
                 <td className="max-w-xs px-3 py-2 text-xs text-ink-muted">
@@ -240,6 +290,15 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
         </Table>
       )}
     </Card>
+  );
+}
+
+function Echo({ result }: { result: { ok: boolean; text: string } | null }) {
+  if (!result) return null;
+  return (
+    <p className={`mt-1 text-xs ${result.ok ? "text-positive" : "text-caution"}`}>
+      {result.ok ? "✓ " : ""}{result.text}
+    </p>
   );
 }
 

@@ -12,7 +12,8 @@ number the profit calculation should be built on.
 
 from __future__ import annotations
 
-from urllib.parse import quote_plus
+import re
+from urllib.parse import quote_plus, urlparse
 
 #: Amazon marketplace code -> domain. Codes follow the two-letter country
 #: convention used by Amazon's own marketplace identifiers.
@@ -154,3 +155,108 @@ def ebay_sold_url(
         "&LH_Sold=1&LH_Complete=1&_sop=13"
     )
     return url + "&LH_TitleDesc=1" if search_descriptions else url
+
+
+# ---------------------------------------------------------------------------
+# Reading an exact offer out of a pasted URL
+# ---------------------------------------------------------------------------
+# The operator is already looking at the page. Pasting its address is less
+# work than typing a product name, and it identifies one specific offer rather
+# than a search that might return something else tomorrow.
+
+#: An ASIN is ten characters, digits and capitals. It appears after /dp/,
+#: /gp/product/ and a few older variants.
+_ASIN_PATTERNS = (
+    re.compile(r"/(?:dp|gp/product|gp/aw/d|product|gp/offer-listing)/([A-Z0-9]{10})(?:[/?#]|$)"),
+    re.compile(r"[?&]asin=([A-Z0-9]{10})", re.IGNORECASE),
+)
+
+#: eBay item ids are 9-15 digits, after /itm/ (sometimes behind a slug).
+_EBAY_PATTERNS = (
+    re.compile(r"/itm/(?:[^/?#]*/)?(\d{9,15})(?:[/?#]|$)"),
+    re.compile(r"[?&]item=(\d{9,15})"),
+)
+
+#: Shortened links cannot be read without following the redirect, which would
+#: mean fetching the page. We ask for the full URL instead of guessing.
+_SHORTENERS = {"amzn.to", "amzn.eu", "a.co", "ebay.us", "ebay.to"}
+
+
+def is_shortened(url: str) -> bool:
+    try:
+        host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    except ValueError:
+        return False
+    return host in _SHORTENERS
+
+
+def extract_asin(url: str | None) -> str | None:
+    """The ASIN from an Amazon product URL, or ``None``."""
+    if not url:
+        return None
+    candidate = url.strip()
+    for pattern in _ASIN_PATTERNS:
+        match = pattern.search(candidate)
+        if match:
+            return match.group(1).upper()
+    # A bare ASIN pasted on its own is unambiguous enough to accept.
+    if re.fullmatch(r"[A-Z0-9]{10}", candidate.upper()) and any(c.isdigit() for c in candidate):
+        return candidate.upper()
+    return None
+
+
+def extract_ebay_item_id(url: str | None) -> str | None:
+    """The item id from an eBay listing URL, or ``None``."""
+    if not url:
+        return None
+    candidate = url.strip()
+    for pattern in _EBAY_PATTERNS:
+        match = pattern.search(candidate)
+        if match:
+            return match.group(1)
+    if re.fullmatch(r"\d{9,15}", candidate):
+        return candidate
+    return None
+
+
+def marketplace_from_url(url: str | None) -> str | None:
+    """The domain of a pasted URL, so links stay on the site they came from."""
+    if not url:
+        return None
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return None
+    return host or None
+
+
+def amazon_offer_url(asin: str, *, marketplace: str | None = None, domain: str | None = None) -> str:
+    """The exact Amazon product page."""
+    return f"https://{domain or amazon_domain(marketplace)}/dp/{quote_plus(asin)}"
+
+
+def ebay_offer_url(item_id: str, *, marketplace: str | None = None, domain: str | None = None) -> str:
+    """The exact eBay listing."""
+    return f"https://{domain or ebay_domain(marketplace)}/itm/{quote_plus(item_id)}"
+
+
+def describe_url(url: str | None, *, site: str) -> str | None:
+    """Why a pasted URL could not be used - shown to the operator verbatim."""
+    if not url or not url.strip():
+        return None
+    if is_shortened(url):
+        return (
+            f"That is a shortened {site} link. Open it, then copy the full address "
+            "from the browser bar."
+        )
+    if site == "Amazon" and extract_asin(url) is None:
+        return (
+            "No product code found in that Amazon link. It should contain /dp/ "
+            "followed by ten characters, for example /dp/B09XS7JWHH."
+        )
+    if site == "eBay" and extract_ebay_item_id(url) is None:
+        return (
+            "No item number found in that eBay link. It should contain /itm/ "
+            "followed by the item number."
+        )
+    return None

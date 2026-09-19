@@ -27,6 +27,17 @@ export default async function OpportunitiesPage({
   const order = params.order === "asc" ? "asc" : "desc";
   const showAll = params.all === "1";
 
+  // In research mode there is no live source feed: discovery can only return
+  // the built-in example catalogue, which is the same ten products every time.
+  // Offering it as "discovery" makes examples look like findings, so it is
+  // replaced by the one thing that does produce real rows here.
+  let researchMode = false;
+  try {
+    researchMode = (await api.health()).research_mode === true;
+  } catch {
+    researchMode = false;
+  }
+
   let page;
   try {
     page = await api.opportunities({
@@ -59,13 +70,17 @@ export default async function OpportunitiesPage({
             <LinkButton href={showAll ? "/opportunities" : "/opportunities?all=1"}>
               {showAll ? "Apply default filters" : "Show everything"}
             </LinkButton>
-            <ActionButton
-              kind="discover"
-              id={0}
-              label="Run discovery"
-              pendingLabel="Discovering..."
-              variant="primary"
-            />
+            {researchMode ? (
+              <LinkButton href="/research" variant="primary">Check a product</LinkButton>
+            ) : (
+              <ActionButton
+                kind="discover"
+                id={0}
+                label="Run discovery"
+                pendingLabel="Discovering..."
+                variant="primary"
+              />
+            )}
           </div>
         }
       />
@@ -90,7 +105,11 @@ export default async function OpportunitiesPage({
         {page.items.length === 0 ? (
           <EmptyState
             title="Nothing meets the thresholds"
-            body="That is the system working as intended: it is tuned to reduce false positives, not to maximise the number of rows. Run discovery, or relax the thresholds in Settings."
+            body={
+              researchMode
+                ? "That is the system working as intended: it is tuned to reduce false positives, not to maximise the number of rows. Check a product under Research, or relax the thresholds in Settings."
+                : "That is the system working as intended: it is tuned to reduce false positives, not to maximise the number of rows. Run discovery, or relax the thresholds in Settings."
+            }
           />
         ) : (
           <Table
