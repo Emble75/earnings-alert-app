@@ -253,3 +253,52 @@ def test_sign_in_may_be_skipped_only_when_nothing_can_be_spent():
     )
     # Not requested: sign-in required.
     assert Settings(research_mode=True).auth_required is True
+
+
+# -- links back to the marketplaces -----------------------------------------
+def test_links_are_generated_from_the_identifier(service, session):
+    """The operator should not have to paste URLs to get them back."""
+    from app.services.opportunity_service import build_links
+
+    opportunity = service.analyse([profitable()]).created[0]
+    links = build_links(opportunity, session)
+
+    assert EAN in links["source_search"]
+    assert "amazon" in links["source_search"]
+    assert EAN in links["target_search"]
+    assert "ebay" in links["target_search"]
+    # The sold-listings link is the one that shows what buyers actually paid.
+    assert "LH_Sold=1" in links["target_sold"]
+    assert "LH_Complete=1" in links["target_sold"]
+
+
+def test_an_explicit_url_beats_a_generated_one(service, session):
+    from app.services.opportunity_service import build_links
+
+    entry = profitable()
+    entry.source_url = "https://www.amazon.de/dp/B09XS7JWHH"
+    entry.target_url = "https://www.ebay.de/itm/123456789"
+    opportunity = service.analyse([entry]).created[0]
+    links = build_links(opportunity, session)
+
+    assert links["source_product"] == entry.source_url
+    assert links["target_search"] == entry.target_url
+    # The sold search is always generated - it is a search, not a listing.
+    assert "LH_Sold=1" in links["target_sold"]
+
+
+def test_links_degrade_to_a_title_search_without_an_identifier(service, session):
+    from app.core.marketplace_links import ebay_sold_url
+
+    assert ebay_sold_url(marketplace="EBAY_DE", title="Sony WH-1000XM5") is not None
+    assert ebay_sold_url(marketplace="EBAY_DE") is None
+
+
+def test_marketplace_domains_follow_the_configured_marketplace():
+    from app.core.marketplace_links import amazon_url, ebay_sold_url
+
+    assert "amazon.co.uk" in amazon_url(marketplace="GB", asin="B01")
+    assert "amazon.com" in amazon_url(marketplace="US", asin="B01")
+    assert "ebay.com" in ebay_sold_url(marketplace="EBAY_US", identifier="123")
+    # An unknown marketplace falls back rather than producing a broken link.
+    assert "amazon.de" in amazon_url(marketplace="ZZ", asin="B01")

@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { ActionButton } from "@/components/actions";
-import { Badge, Card, DefinitionList, ErrorNotice, Money, PageHeader, StateBadge, Table } from "@/components/ui";
+import {
+  Badge, Card, DefinitionList, ErrorNotice, ExternalLink, Money, PageHeader, StateBadge, Table,
+} from "@/components/ui";
 import { ApiRequestError, api } from "@/lib/api";
 import { confidence, dateTime, money, percent, relativeAge, riskTone, titleCase } from "@/lib/format";
 
@@ -144,16 +146,17 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
               </div>
               {detail.source_offer?.seller_name && <div>Seller: {detail.source_offer.seller_name}</div>}
             </dl>
-            {detail.source_offer?.url && (
-              <a
-                href={detail.source_offer.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-block text-xs font-medium text-accent hover:underline"
-              >
-                Open the source listing ↗
-              </a>
-            )}
+            <div className="mt-3 flex flex-col gap-1">
+              <ExternalLink href={detail.links?.source_product} strong>
+                Open on Amazon
+              </ExternalLink>
+              {detail.links?.source_search &&
+                detail.links.source_search !== detail.links.source_product && (
+                  <ExternalLink href={detail.links.source_search}>
+                    Search Amazon for this EAN
+                  </ExternalLink>
+                )}
+            </div>
           </div>
 
           <div>
@@ -189,16 +192,17 @@ export default async function OpportunityPage({ params }: { params: Promise<{ id
                 <span className="font-medium text-ink">{confidence(detail.match_confidence)}</span>
               </div>
             </dl>
-            {detail.target_listing?.url && (
-              <a
-                href={detail.target_listing.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-block text-xs font-medium text-accent hover:underline"
-              >
-                Open the target listing ↗
-              </a>
-            )}
+            <div className="mt-3 flex flex-col gap-1">
+              <ExternalLink href={detail.links?.target_sold} strong>
+                What it actually sold for on eBay
+              </ExternalLink>
+              <ExternalLink href={detail.links?.target_search}>
+                Current eBay listings
+              </ExternalLink>
+              <p className="mt-1 text-xs text-ink-muted">
+                Sold listings show what buyers paid. Asking prices show what sellers hope for.
+              </p>
+            </div>
           </div>
         </div>
       </Card>

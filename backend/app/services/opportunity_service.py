@@ -723,6 +723,49 @@ class OpportunityService:
         return expired
 
 
+def build_links(opportunity: Opportunity, session: Session) -> dict[str, str | None]:
+    """Links back to both marketplaces for one opportunity.
+
+    An explicitly supplied URL always wins: the operator looked at that exact
+    page, and a generated search is only a substitute for not knowing it.
+    """
+    from app.core.config import get_settings
+    from app.core.marketplace_links import amazon_url, ebay_search_url, ebay_sold_url
+
+    settings = get_settings()
+    product = opportunity.product
+    offer = opportunity.source_offer
+    listing = opportunity.target_listing
+
+    identifier = product.primary_identifier_value if product else None
+    title = product.title if product else (offer.title if offer else None)
+    asin = None
+    if product is not None:
+        asin = next(
+            (i.value for i in product.identifiers if i.identifier_type.value == "ASIN"), None
+        )
+
+    generated_source = amazon_url(
+        marketplace=settings.amazon_marketplace, asin=asin, identifier=identifier, title=title
+    )
+    return {
+        "source_product": (offer.url if offer and offer.url else generated_source),
+        "source_search": amazon_url(
+            marketplace=settings.amazon_marketplace, identifier=identifier, title=title
+        ),
+        "target_search": (
+            listing.url
+            if listing and listing.url
+            else ebay_search_url(
+                marketplace=settings.ebay_marketplace, identifier=identifier, title=title
+            )
+        ),
+        "target_sold": ebay_sold_url(
+            marketplace=settings.ebay_marketplace, identifier=identifier, title=title
+        ),
+    }
+
+
 def condition_matches(source: ProductCondition, target: ProductCondition) -> bool:
     return source is target and source is not ProductCondition.UNKNOWN
 

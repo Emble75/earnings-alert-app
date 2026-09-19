@@ -33,6 +33,13 @@ export interface Page<T> {
   offset: number;
 }
 
+export interface MarketplaceLinks {
+  source_product: string | null;
+  source_search: string | null;
+  target_search: string | null;
+  target_sold: string | null;
+}
+
 export interface ProductSummary {
   id: number;
   title: string;
@@ -83,6 +90,7 @@ export interface Opportunity {
   quantity: number;
   product_id: number | null;
   product: ProductSummary | null;
+  links: MarketplaceLinks | null;
   source_price: string | null;
   target_price: string | null;
   total_costs: string | null;

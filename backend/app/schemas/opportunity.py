@@ -16,6 +16,16 @@ from app.models.enums import (
 from app.schemas.common import ApiModel, DecimalStringMixin
 
 
+class MarketplaceLinks(ApiModel):
+    """Where to go and check this yourself."""
+
+    source_product: str | None = None
+    source_search: str | None = None
+    target_search: str | None = None
+    #: Completed eBay sales - what buyers actually paid, not what sellers ask.
+    target_sold: str | None = None
+
+
 class ProductSummary(ApiModel):
     """Which product this opportunity is actually about."""
 
@@ -75,6 +85,7 @@ class OpportunityOut(ApiModel, DecimalStringMixin):
     source_offer_id: int | None = None
     target_listing_id: int | None = None
     product: ProductSummary | None = None
+    links: MarketplaceLinks | None = None
 
     source_price: Decimal | None = None
     target_price: Decimal | None = None

@@ -166,3 +166,28 @@ export function DefinitionList({ rows }: { rows: Array<[string, ReactNode]> }) {
     </dl>
   );
 }
+
+export function ExternalLink({
+  href,
+  children,
+  strong = false,
+}: {
+  href: string | null | undefined;
+  children: ReactNode;
+  strong?: boolean;
+}) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`inline-flex items-center gap-1 text-accent hover:underline ${
+        strong ? "text-sm font-medium" : "text-xs font-medium"
+      }`}
+    >
+      {children}
+      <span aria-hidden="true">↗</span>
+    </a>
+  );
+}

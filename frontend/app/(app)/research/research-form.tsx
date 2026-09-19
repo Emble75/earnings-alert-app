@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
-import { Badge, Card, Money, Table } from "@/components/ui";
+import { Badge, Card, ExternalLink, Money, Table } from "@/components/ui";
 import { confidence, percent } from "@/lib/format";
 import { riskTone } from "@/lib/format";
 
@@ -77,7 +77,7 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
       {opportunities.length === 0 ? (
         <p className="text-sm text-ink-muted">Nothing was analysed.</p>
       ) : (
-        <Table head={["Product", "Verdict", "Net profit", "Margin", "Risk", "Match", "Why", ""]}>
+        <Table head={["Product", "Verdict", "Net profit", "Margin", "Risk", "Match", "Check", ""]}>
           {opportunities.map((item) => {
             const why =
               item.rejected_reason ??
@@ -104,8 +104,16 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
                   <Badge tone={riskTone(item.risk_score)}>{item.risk_score ?? "—"}</Badge>
                 </td>
                 <td className="numeric px-3 py-2">{confidence(item.match_confidence)}</td>
-                <td className="max-w-md px-3 py-2 text-xs text-ink-muted">{why}</td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-col gap-0.5">
+                    <ExternalLink href={item.links?.source_product}>Amazon</ExternalLink>
+                    <ExternalLink href={item.links?.target_sold}>eBay sold</ExternalLink>
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-right">
+                  <div className="max-w-xs truncate text-xs text-ink-muted" title={why}>
+                    {why}
+                  </div>
                   <Link
                     href={`/opportunities/${item.id}`}
                     className="text-xs font-medium text-accent hover:underline"

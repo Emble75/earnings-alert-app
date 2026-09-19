@@ -1,7 +1,9 @@
 import { ActionButton } from "@/components/actions";
-import { Badge, Card, EmptyState, ErrorNotice, LinkButton, Money, PageHeader, StateBadge, Table } from "@/components/ui";
+import {
+  Badge, Card, EmptyState, ErrorNotice, ExternalLink, LinkButton, Money, PageHeader, StateBadge, Table,
+} from "@/components/ui";
 import { ApiRequestError, api } from "@/lib/api";
-import { confidence, percent, relativeAge, riskTone } from "@/lib/format";
+import { confidence, percent, riskTone } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +94,7 @@ export default async function OpportunitiesPage({
           />
         ) : (
           <Table
-            head={["Product", "State", "Source", "Target", "Net profit", "Margin", "ROI", "Risk", "Match", "Freshness", ""]}
+            head={["Product", "State", "Source", "Target", "Net profit", "Margin", "ROI", "Risk", "Match", "Check", ""]}
           >
             {page.items.map((item) => (
               <tr key={item.id}>
@@ -116,7 +118,12 @@ export default async function OpportunitiesPage({
                   <Badge tone={riskTone(item.risk_score)}>{item.risk_score ?? "—"}</Badge>
                 </td>
                 <td className="numeric px-3 py-2">{confidence(item.match_confidence)}</td>
-                <td className="px-3 py-2 text-xs text-ink-muted">{relativeAge(item.source_price_timestamp)}</td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-col gap-0.5">
+                    <ExternalLink href={item.links?.source_product}>Amazon</ExternalLink>
+                    <ExternalLink href={item.links?.target_sold}>eBay sold</ExternalLink>
+                  </div>
+                </td>
                 <td className="px-3 py-2 text-right">
                   <LinkButton href={`/opportunities/${item.id}`}>Open</LinkButton>
                 </td>

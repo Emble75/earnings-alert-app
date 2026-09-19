@@ -16,13 +16,20 @@ from app.api.deps import BusinessSettings, CurrentUser, Operator, Providers, TxS
 from app.core.errors import ValidationError
 from app.models.enums import ProductCondition, StockStatus
 from app.schemas.common import ApiModel
-from app.schemas.opportunity import OpportunityOut
+from app.schemas.opportunity import MarketplaceLinks, OpportunityOut
+from app.services.opportunity_service import build_links
 from app.services.research_service import (
     COLUMNS,
     CSV_TEMPLATE,
     ResearchInput,
     ResearchService,
 )
+
+
+def _out(session, opportunity) -> OpportunityOut:
+    out = OpportunityOut.model_validate(opportunity)
+    out.links = MarketplaceLinks(**build_links(opportunity, session))
+    return out
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -98,7 +105,7 @@ def analyse(
     outcome = service.analyse([product.to_input() for product in payload.products])
     return ResearchResponse(
         summary=outcome.summary(),
-        opportunities=[OpportunityOut.model_validate(o) for o in outcome.created],
+        opportunities=[_out(session, o) for o in outcome.created],
         errors=outcome.errors,
     )
 
@@ -128,6 +135,6 @@ async def analyse_csv(
     outcome = ResearchService(session, config, providers).analyse_csv(content)
     return ResearchResponse(
         summary=outcome.summary(),
-        opportunities=[OpportunityOut.model_validate(o) for o in outcome.created],
+        opportunities=[_out(session, o) for o in outcome.created],
         errors=outcome.errors,
     )

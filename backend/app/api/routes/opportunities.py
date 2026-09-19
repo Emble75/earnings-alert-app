@@ -16,10 +16,11 @@ from app.schemas.common import Page
 from app.schemas.opportunity import (
     DiscoverRequest,
     EvaluationOut,
+    MarketplaceLinks,
     OpportunityDetailOut,
     OpportunityOut,
 )
-from app.services.opportunity_service import OpportunityService
+from app.services.opportunity_service import OpportunityService, build_links
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -42,6 +43,12 @@ _SORTABLE = {
     "capital_required": Opportunity.capital_required,
     "created_at": Opportunity.created_at,
 }
+
+
+def _with_links(session, opportunity: Opportunity) -> OpportunityOut:
+    out = OpportunityOut.model_validate(opportunity)
+    out.links = MarketplaceLinks(**build_links(opportunity, session))
+    return out
 
 
 def _load(session, opportunity_id: int) -> Opportunity:
@@ -108,7 +115,7 @@ def list_opportunities(
         ).scalars()
     )
     return Page(
-        items=[OpportunityOut.model_validate(row) for row in rows],
+        items=[_with_links(session, row) for row in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -125,6 +132,7 @@ def get_opportunity(
 ) -> OpportunityDetailOut:
     opportunity = _load(session, opportunity_id)
     detail = OpportunityDetailOut.model_validate(opportunity)
+    detail.links = MarketplaceLinks(**build_links(opportunity, session))
     detail.staleness = OpportunityService(session, config, providers).staleness(opportunity)
     return detail
 
@@ -144,7 +152,7 @@ def discover(
             evaluation = service.evaluate(opportunity)
             results.append(
                 EvaluationOut(
-                    opportunity=OpportunityOut.model_validate(opportunity),
+                    opportunity=_with_links(session, opportunity),
                     decision=evaluation.decision,
                     reasons=[str(r) for r in evaluation.reasons],
                 )
@@ -152,7 +160,7 @@ def discover(
         else:
             results.append(
                 EvaluationOut(
-                    opportunity=OpportunityOut.model_validate(opportunity),
+                    opportunity=_with_links(session, opportunity),
                     decision=opportunity.decision or "REVIEW",
                     reasons=[],
                 )
@@ -171,7 +179,7 @@ def evaluate(
     opportunity = _load(session, opportunity_id)
     evaluation = OpportunityService(session, config, providers).evaluate(opportunity)
     return EvaluationOut(
-        opportunity=OpportunityOut.model_validate(opportunity),
+        opportunity=_with_links(session, opportunity),
         decision=evaluation.decision,
         reasons=[str(r) for r in evaluation.reasons],
     )
@@ -188,7 +196,7 @@ def revalidate(
     opportunity = _load(session, opportunity_id)
     evaluation = OpportunityService(session, config, providers).revalidate(opportunity)
     return EvaluationOut(
-        opportunity=OpportunityOut.model_validate(opportunity),
+        opportunity=_with_links(session, opportunity),
         decision=evaluation.decision,
         reasons=[str(r) for r in evaluation.reasons],
     )
