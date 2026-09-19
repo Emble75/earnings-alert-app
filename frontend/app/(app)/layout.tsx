@@ -8,8 +8,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const signInNeeded = await authRequired();
 
   let mode: string | null = null;
+  let researchMode = false;
   try {
     const health = await api.health();
+    researchMode = health.research_mode === true;
     // Research mode is checked first: it is the strongest statement about
     // what this install can do, and the one the operator most needs to see.
     mode = health.research_mode
@@ -28,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <aside className="w-48 shrink-0">
         <p className="px-3 text-sm font-semibold">Arbitrage</p>
         <p className="mb-4 px-3 text-xs text-ink-muted">sell-first operations</p>
-        <Nav />
+        <Nav researchMode={researchMode} />
         {signInNeeded && (
           <form action="/api/auth/logout" method="post" className="mt-6 px-3">
             <button type="submit" className="text-xs text-ink-muted hover:text-ink">

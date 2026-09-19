@@ -24,28 +24,27 @@ export default async function ResearchPage() {
   return (
     <>
       <PageHeader
-        title="Research"
-        description="Analyse real products you have looked up yourself. No marketplace account needed — the same profit, risk and matching engine runs on the numbers you enter."
+        title="Check a product"
+        description="Is there money in it? Type the brand, model and EAN, open the two lookup links, enter what you see, and get an answer."
       />
 
-      <Card title="How this works">
-        <ol className="list-inside list-decimal space-y-2 text-sm text-ink-muted">
+      <Card title="The three numbers that decide it">
+        <ol className="list-inside list-decimal space-y-1.5 text-sm text-ink-muted">
           <li>
-            Find a product on Amazon. Note its price, its EAN (on the product
-            page under &ldquo;Product information&rdquo;), and whether it is in stock.
+            What you pay on <strong className="text-ink">Amazon</strong>.
           </li>
           <li>
-            Search the same EAN on eBay. Note what comparable items{" "}
-            <strong className="text-ink">actually sell for</strong> — completed
-            listings, not the most optimistic asking price.
+            What it <strong className="text-ink">actually sold for</strong> on eBay —
+            completed sales, not what hopeful sellers are asking.
           </li>
-          <li>Put both into a row below and analyse.</li>
+          <li>Whether Amazon can deliver it in time.</li>
         </ol>
-        <ul className="mt-4 space-y-1 border-t border-border pt-3 text-xs text-ink-muted">
-          {notes.map((note) => (
-            <li key={note}>· {note}</li>
-          ))}
-        </ul>
+        <p className="mt-3 border-t border-border pt-3 text-xs text-ink-muted">
+          Everything else — eBay fees, postage, packaging, returns, a risk
+          reserve — is worked out for you. The EAN is what proves the Amazon item
+          and the eBay listing are the same product; without it the answer would
+          be a guess, so it is required.
+        </p>
       </Card>
 
       <ResearchForm template={template} />

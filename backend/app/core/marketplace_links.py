@@ -82,29 +82,75 @@ def amazon_url(
     return f"https://{domain}/s?k={quote_plus(query)}"
 
 
+def ebay_query(
+    *,
+    brand: str | None = None,
+    model: str | None = None,
+    title: str | None = None,
+    identifier: str | None = None,
+) -> tuple[str, bool]:
+    """Build an eBay search that actually finds the product.
+
+    Searching eBay by EAN returns nothing almost every time: sellers do not
+    put the number in the listing title, and eBay's default search only looks
+    at titles. Brand plus model is what matches a real listing.
+
+    Returns the query and whether descriptions should be searched too - which
+    only helps for the identifier fallback, where the number, if it appears at
+    all, is buried in the description.
+    """
+    brand = (brand or "").strip()
+    model = (model or "").strip()
+    if brand and model:
+        # "Sony WH-1000XM5" - how a seller actually titles it.
+        return (f"{brand} {model}" if model.lower() not in brand.lower() else brand), False
+    if model:
+        return model, False
+    if title:
+        return title.strip(), False
+    if identifier:
+        return identifier.strip(), True
+    return "", False
+
+
 def ebay_search_url(
-    *, marketplace: str | None = None, identifier: str | None = None, title: str | None = None
+    *,
+    marketplace: str | None = None,
+    identifier: str | None = None,
+    title: str | None = None,
+    brand: str | None = None,
+    model: str | None = None,
 ) -> str | None:
     """Current eBay listings - what other sellers are asking."""
-    query = (identifier or title or "").strip()
+    query, search_descriptions = ebay_query(
+        brand=brand, model=model, title=title, identifier=identifier
+    )
     if not query:
         return None
-    return f"https://{ebay_domain(marketplace)}/sch/i.html?_nkw={quote_plus(query)}"
+    url = f"https://{ebay_domain(marketplace)}/sch/i.html?_nkw={quote_plus(query)}"
+    return url + "&LH_TitleDesc=1" if search_descriptions else url
 
 
 def ebay_sold_url(
-    *, marketplace: str | None = None, identifier: str | None = None, title: str | None = None
+    *,
+    marketplace: str | None = None,
+    identifier: str | None = None,
+    title: str | None = None,
+    brand: str | None = None,
+    model: str | None = None,
 ) -> str | None:
     """eBay listings that actually sold - what buyers actually paid.
 
     ``LH_Sold`` and ``LH_Complete`` restrict the search to completed sales.
     This is the link to trust when setting a target price.
     """
-    query = (identifier or title or "").strip()
+    query, search_descriptions = ebay_query(
+        brand=brand, model=model, title=title, identifier=identifier
+    )
     if not query:
         return None
-    domain = ebay_domain(marketplace)
-    return (
-        f"https://{domain}/sch/i.html?_nkw={quote_plus(query)}"
+    url = (
+        f"https://{ebay_domain(marketplace)}/sch/i.html?_nkw={quote_plus(query)}"
         "&LH_Sold=1&LH_Complete=1&_sop=13"
     )
+    return url + "&LH_TitleDesc=1" if search_descriptions else url

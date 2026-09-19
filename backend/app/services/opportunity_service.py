@@ -739,6 +739,8 @@ def build_links(opportunity: Opportunity, session: Session) -> dict[str, str | N
 
     identifier = product.primary_identifier_value if product else None
     title = product.title if product else (offer.title if offer else None)
+    brand = (product.brand if product else None) or (offer.brand if offer else None)
+    model = (product.model if product else None) or (offer.model if offer else None)
     asin = None
     if product is not None:
         asin = next(
@@ -757,11 +759,19 @@ def build_links(opportunity: Opportunity, session: Session) -> dict[str, str | N
             listing.url
             if listing and listing.url
             else ebay_search_url(
-                marketplace=settings.ebay_marketplace, identifier=identifier, title=title
+                marketplace=settings.ebay_marketplace,
+                identifier=identifier,
+                title=title,
+                brand=brand,
+                model=model,
             )
         ),
         "target_sold": ebay_sold_url(
-            marketplace=settings.ebay_marketplace, identifier=identifier, title=title
+            marketplace=settings.ebay_marketplace,
+            identifier=identifier,
+            title=title,
+            brand=brand,
+            model=model,
         ),
     }
 

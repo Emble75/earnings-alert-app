@@ -263,10 +263,14 @@ def test_links_are_generated_from_the_identifier(service, session):
     opportunity = service.analyse([profitable()]).created[0]
     links = build_links(opportunity, session)
 
+    # Amazon matches on the identifier, so it uses it.
     assert EAN in links["source_search"]
     assert "amazon" in links["source_search"]
-    assert EAN in links["target_search"]
+    # eBay does not: it is searched by brand and model, which is what a real
+    # listing title contains.
     assert "ebay" in links["target_search"]
+    assert "Sony+WH-1000XM5" in links["target_search"]
+    assert EAN not in links["target_search"]
     # The sold-listings link is the one that shows what buyers actually paid.
     assert "LH_Sold=1" in links["target_sold"]
     assert "LH_Complete=1" in links["target_sold"]
@@ -302,3 +306,47 @@ def test_marketplace_domains_follow_the_configured_marketplace():
     assert "ebay.com" in ebay_sold_url(marketplace="EBAY_US", identifier="123")
     # An unknown marketplace falls back rather than producing a broken link.
     assert "amazon.de" in amazon_url(marketplace="ZZ", asin="B01")
+
+
+def test_ebay_is_searched_by_brand_and_model_not_by_ean():
+    """Searching eBay by EAN returns nothing: sellers do not title listings
+    with the number, and eBay's default search only reads titles."""
+    from app.core.marketplace_links import ebay_query, ebay_sold_url
+
+    query, descriptions = ebay_query(brand="Dell", model="S2722DC", identifier="5397184609941")
+    assert query == "Dell S2722DC"
+    assert descriptions is False
+
+    url = ebay_sold_url(
+        marketplace="EBAY_DE", brand="Dell", model="S2722DC", identifier="5397184609941"
+    )
+    assert "Dell+S2722DC" in url
+    assert "5397184609941" not in url
+
+
+def test_ebay_falls_back_through_model_then_title_then_identifier():
+    from app.core.marketplace_links import ebay_query
+
+    assert ebay_query(model="S2722DC")[0] == "S2722DC"
+    assert ebay_query(title="Dell S2722DC Monitor")[0] == "Dell S2722DC Monitor"
+    # Only the last resort searches descriptions, where a number might appear.
+    query, descriptions = ebay_query(identifier="5397184609941")
+    assert query == "5397184609941"
+    assert descriptions is True
+    assert ebay_query()[0] == ""
+
+
+def test_a_model_already_inside_the_brand_is_not_repeated():
+    from app.core.marketplace_links import ebay_query
+
+    assert ebay_query(brand="Dell S2722DC", model="S2722DC")[0] == "Dell S2722DC"
+
+
+def test_amazon_still_uses_the_identifier(service, session):
+    """Amazon's search does match on EAN, so it keeps using it."""
+    from app.services.opportunity_service import build_links
+
+    opportunity = service.analyse([profitable()]).created[0]
+    links = build_links(opportunity, session)
+    assert EAN in links["source_search"]
+    assert "Sony+WH-1000XM5" in links["target_sold"]

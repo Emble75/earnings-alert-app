@@ -3,10 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS: Array<[string, string]> = [
-  ["/dashboard", "Dashboard"],
+/** What research needs, in the order you use it. */
+const RESEARCH_LINKS: Array<[string, string]> = [
+  ["/research", "Check a product"],
   ["/opportunities", "Opportunities"],
-  ["/research", "Research"],
+  ["/dashboard", "Overview"],
+  ["/products", "Products"],
+  ["/analytics", "Analytics"],
+  ["/risk", "Risk"],
+  ["/settings", "Settings"],
+];
+
+/** Everything, once the system is allowed to act. */
+const FULL_LINKS: Array<[string, string]> = [
+  ["/dashboard", "Dashboard"],
+  ["/research", "Check a product"],
+  ["/opportunities", "Opportunities"],
   ["/products", "Products"],
   ["/listings", "Listings"],
   ["/orders", "Orders"],
@@ -20,11 +32,14 @@ const LINKS: Array<[string, string]> = [
   ["/logs", "Logs"],
 ];
 
-export function Nav() {
+export function Nav({ researchMode = false }: { researchMode?: boolean }) {
   const pathname = usePathname();
+  // The selling, shipping and returns pages cannot do anything in research
+  // mode. Showing them is clutter that makes the tool look harder than it is.
+  const links = researchMode ? RESEARCH_LINKS : FULL_LINKS;
   return (
     <nav className="flex flex-col gap-0.5">
-      {LINKS.map(([href, label]) => {
+      {links.map(([href, label]) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link

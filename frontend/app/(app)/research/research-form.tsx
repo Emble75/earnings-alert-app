@@ -1,47 +1,112 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Badge, Card, ExternalLink, Money, Table } from "@/components/ui";
-import { confidence, percent } from "@/lib/format";
-import { riskTone } from "@/lib/format";
+import { confidence, percent, riskTone } from "@/lib/format";
 
-import { analyseCsv, type ResearchActionResult } from "./actions";
+import { analyseCsv, checkOneProduct, type ResearchActionResult } from "./actions";
 
 const INITIAL: ResearchActionResult = { ok: false };
 
+const FIELD =
+  "mt-1 w-full rounded border border-border bg-surface-raised px-3 py-2 text-sm";
+const LABEL = "text-xs font-medium text-ink-muted";
+
 export function ResearchForm({ template }: { template: string }) {
-  const [state, formAction, pending] = useActionState(analyseCsv, INITIAL);
+  const [state, formAction, pending] = useActionState(checkOneProduct, INITIAL);
+  const [showBulk, setShowBulk] = useState(false);
+
+  // Typed live so the lookup links work before any price is known - that is
+  // the order the work actually happens in: look it up, then price it.
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [ean, setEan] = useState("");
+
+  const query = [brand, model].filter(Boolean).join(" ").trim();
+  const amazonUrl = ean
+    ? `https://www.amazon.de/s?k=${encodeURIComponent(ean)}`
+    : query
+      ? `https://www.amazon.de/s?k=${encodeURIComponent(query)}`
+      : null;
+  // eBay is searched by brand and model: sellers do not put the EAN in a title.
+  const ebaySoldUrl = query
+    ? `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1&_sop=13`
+    : null;
 
   return (
     <>
       <Card
-        title="Paste your products"
-        subtitle="One row per product. Only title, source_price and target_price are required — but include the EAN, or the system cannot confirm the two sides are the same item."
+        title="Check a product"
+        subtitle="Fill in what you see on the two sites. The links below open the right searches for you."
       >
-        <form action={formAction} className="space-y-3">
-          <textarea
-            name="csv"
-            rows={10}
-            spellCheck={false}
-            defaultValue={template}
-            className="numeric w-full rounded border border-border bg-surface px-3 py-2 text-xs"
-            aria-label="Products as CSV"
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              {pending ? "Analysing..." : "Analyse these products"}
-            </button>
-            <p className="text-xs text-ink-muted">
-              Comma, semicolon and tab separated files all work, as do European
-              numbers like <span className="numeric">199,00</span>.
-            </p>
+        <form action={formAction} className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="brand" className={LABEL}>Brand *</label>
+              <input id="brand" name="brand" required placeholder="Sony" className={FIELD}
+                value={brand} onChange={(e) => setBrand(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="model" className={LABEL}>Model *</label>
+              <input id="model" name="model" required placeholder="WH-1000XM5" className={FIELD}
+                value={model} onChange={(e) => setModel(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="ean" className={LABEL}>EAN *</label>
+              <input id="ean" name="ean" required placeholder="4548736134584"
+                className={`${FIELD} numeric`} value={ean} onChange={(e) => setEan(e.target.value)} />
+            </div>
           </div>
+
+          {(amazonUrl || ebaySoldUrl) && (
+            <div className="flex flex-wrap items-center gap-4 rounded border border-border bg-surface px-3 py-2">
+              <span className="text-xs text-ink-muted">Look it up:</span>
+              <ExternalLink href={amazonUrl}>Amazon (buy price)</ExternalLink>
+              <ExternalLink href={ebaySoldUrl}>eBay — what it sold for</ExternalLink>
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label htmlFor="source_price" className={LABEL}>Amazon price *</label>
+              <input id="source_price" name="source_price" required inputMode="decimal"
+                placeholder="199.00" className={`${FIELD} numeric`} />
+            </div>
+            <div>
+              <label htmlFor="target_price" className={LABEL}>eBay sold price *</label>
+              <input id="target_price" name="target_price" required inputMode="decimal"
+                placeholder="319.00" className={`${FIELD} numeric`} />
+              <p className="mt-1 text-xs text-ink-muted">What it sold for, not asking prices.</p>
+            </div>
+            <div>
+              <label htmlFor="source_stock" className={LABEL}>In stock on Amazon?</label>
+              <select id="source_stock" name="source_stock" defaultValue="IN_STOCK" className={FIELD}>
+                <option value="IN_STOCK">Yes, in stock</option>
+                <option value="LOW_STOCK">Only a few left</option>
+                <option value="OUT_OF_STOCK">Out of stock</option>
+                <option value="UNKNOWN">Not sure</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="source_delivery_days" className={LABEL}>Amazon delivery (days)</label>
+              <input id="source_delivery_days" name="source_delivery_days" inputMode="numeric"
+                defaultValue="2" className={`${FIELD} numeric`} />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" disabled={pending}
+              className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+              {pending ? "Checking..." : "Is this worth doing?"}
+            </button>
+            <button type="button" onClick={() => setShowBulk((open) => !open)}
+              className="text-xs font-medium text-accent hover:underline">
+              {showBulk ? "Hide bulk check" : "Check many at once instead"}
+            </button>
+          </div>
+
           {state.message && !state.ok && (
             <p className="rounded border border-negative/30 bg-negative/10 p-3 text-sm text-negative">
               {state.message}
@@ -50,6 +115,32 @@ export function ResearchForm({ template }: { template: string }) {
         </form>
       </Card>
 
+      {showBulk && <BulkForm template={template} />}
+      {state.ok && state.data && <Results data={state.data} />}
+    </>
+  );
+}
+
+function BulkForm({ template }: { template: string }) {
+  const [state, formAction, pending] = useActionState(analyseCsv, INITIAL);
+  return (
+    <>
+      <Card title="Check many at once" subtitle="One row per product. Comma, semicolon or tab separated.">
+        <form action={formAction} className="space-y-3">
+          <textarea name="csv" rows={8} spellCheck={false} defaultValue={template}
+            className="numeric w-full rounded border border-border bg-surface px-3 py-2 text-xs"
+            aria-label="Products as CSV" />
+          <button type="submit" disabled={pending}
+            className="rounded bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+            {pending ? "Analysing..." : "Analyse all of them"}
+          </button>
+          {state.message && !state.ok && (
+            <p className="rounded border border-negative/30 bg-negative/10 p-3 text-sm text-negative">
+              {state.message}
+            </p>
+          )}
+        </form>
+      </Card>
       {state.ok && state.data && <Results data={state.data} />}
     </>
   );
@@ -57,27 +148,61 @@ export function ResearchForm({ template }: { template: string }) {
 
 function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) {
   const { summary, opportunities, errors } = data;
+  const single = opportunities.length === 1 ? opportunities[0] : null;
+
+  // One product gets a verdict, not a table. It is the question that was asked.
+  if (single) {
+    const worthIt = single.state === "ACTIONABLE";
+    const why =
+      single.rejected_reason ??
+      single.blocked_reason ??
+      (single.decision_reasons[0] ? String(single.decision_reasons[0]) : "");
+    return (
+      <Card title={single.product?.title ?? "Result"}>
+        <div className="flex flex-wrap items-baseline gap-4">
+          <Verdict state={single.state} large />
+          <span className="text-3xl font-semibold">
+            <Money value={single.expected_net_profit} currency={single.currency} signed />
+          </span>
+          <span className="text-sm text-ink-muted">
+            {percent(single.profit_margin)} margin · risk {single.risk_score ?? "—"}/100 ·
+            match {confidence(single.match_confidence)}
+          </span>
+        </div>
+        {!worthIt && why && (
+          <p className="mt-3 rounded border border-caution/30 bg-caution/10 p-3 text-sm text-caution">
+            {why}
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap gap-4">
+          <ExternalLink href={single.links?.source_product}>Open on Amazon</ExternalLink>
+          <ExternalLink href={single.links?.target_sold}>eBay sold listings</ExternalLink>
+          <Link href={`/opportunities/${single.id}`}
+            className="text-xs font-medium text-accent hover:underline">
+            Full breakdown
+          </Link>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card
-      title={`Analysed ${summary.analysed} product${summary.analysed === 1 ? "" : "s"}`}
-      subtitle={`${summary.actionable} worth acting on · ${summary.rejected} rejected · ${summary.blocked} blocked`}
+      title={`Checked ${summary.analysed} products`}
+      subtitle={`${summary.actionable} worth doing · ${summary.rejected} not worth it · ${summary.blocked} blocked`}
     >
       {errors.length > 0 && (
         <div className="mb-3 rounded border border-caution/30 bg-caution/10 p-3">
           <p className="text-sm font-medium text-caution">Some rows could not be read</p>
           <ul className="mt-1 list-inside list-disc text-sm text-ink-muted">
-            {errors.map((error) => (
-              <li key={error}>{error}</li>
-            ))}
+            {errors.map((error) => <li key={error}>{error}</li>)}
           </ul>
         </div>
       )}
-
       {opportunities.length === 0 ? (
         <p className="text-sm text-ink-muted">Nothing was analysed.</p>
       ) : (
-        <Table head={["Product", "Verdict", "Net profit", "Margin", "Risk", "Match", "Check", ""]}>
+        <Table head={["Product", "Verdict", "Net profit", "Margin", "Risk", "Check", "Why"]}>
           {opportunities.map((item) => {
             const why =
               item.rejected_reason ??
@@ -85,17 +210,14 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
               (item.decision_reasons[0] ? String(item.decision_reasons[0]) : "");
             return (
               <tr key={item.id}>
-                <td className="max-w-[16rem] px-3 py-2">
-                  <div className="truncate font-medium" title={item.product?.title ?? undefined}>
+                <td className="max-w-[15rem] px-3 py-2">
+                  <Link href={`/opportunities/${item.id}`}
+                    className="block truncate font-medium hover:underline"
+                    title={item.product?.title ?? undefined}>
                     {item.product?.title ?? item.reference}
-                  </div>
-                  <div className="numeric truncate text-xs text-ink-muted">
-                    {item.product?.primary_identifier_value ?? item.reference}
-                  </div>
+                  </Link>
                 </td>
-                <td className="px-3 py-2">
-                  <Verdict state={item.state} />
-                </td>
+                <td className="px-3 py-2"><Verdict state={item.state} /></td>
                 <td className="px-3 py-2">
                   <Money value={item.expected_net_profit} currency={item.currency} signed />
                 </td>
@@ -103,23 +225,14 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
                 <td className="px-3 py-2">
                   <Badge tone={riskTone(item.risk_score)}>{item.risk_score ?? "—"}</Badge>
                 </td>
-                <td className="numeric px-3 py-2">{confidence(item.match_confidence)}</td>
                 <td className="px-3 py-2">
                   <div className="flex flex-col gap-0.5">
                     <ExternalLink href={item.links?.source_product}>Amazon</ExternalLink>
                     <ExternalLink href={item.links?.target_sold}>eBay sold</ExternalLink>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right">
-                  <div className="max-w-xs truncate text-xs text-ink-muted" title={why}>
-                    {why}
-                  </div>
-                  <Link
-                    href={`/opportunities/${item.id}`}
-                    className="text-xs font-medium text-accent hover:underline"
-                  >
-                    Details
-                  </Link>
+                <td className="max-w-xs px-3 py-2 text-xs text-ink-muted">
+                  <span className="line-clamp-2">{why}</span>
                 </td>
               </tr>
             );
@@ -130,9 +243,19 @@ function Results({ data }: { data: NonNullable<ResearchActionResult["data"]> }) 
   );
 }
 
-function Verdict({ state }: { state: string }) {
-  if (state === "ACTIONABLE") return <Badge tone="positive">Worth doing</Badge>;
-  if (state === "BLOCKED") return <Badge tone="negative">Blocked</Badge>;
-  if (state === "REJECTED") return <Badge tone="caution">Not worth it</Badge>;
-  return <Badge>{state}</Badge>;
+function Verdict({ state, large = false }: { state: string; large?: boolean }) {
+  const label =
+    state === "ACTIONABLE" ? "Worth doing"
+    : state === "BLOCKED" ? "Blocked"
+    : state === "REJECTED" ? "Not worth it"
+    : state;
+  const tone = state === "ACTIONABLE" ? "positive" : state === "BLOCKED" ? "negative" : "caution";
+  if (!large) return <Badge tone={tone}>{label}</Badge>;
+  return (
+    <span className={`text-lg font-semibold ${
+      tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : "text-caution"
+    }`}>
+      {label}
+    </span>
+  );
 }
