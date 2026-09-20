@@ -232,6 +232,122 @@ def ensure_database_matches_the_code() -> None:
     say(f"  starting a fresh one. The old file is kept as {backup.name}.")
 
 
+# ---------------------------------------------------------------------------
+# Connecting eBay
+# ---------------------------------------------------------------------------
+def write_env(values: dict[str, str]) -> None:
+    """Merge settings into .env, leaving anything already there alone."""
+    lines: list[str] = []
+    if ENV_FILE.exists():
+        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+
+    remaining = dict(values)
+    out: list[str] = []
+    for line in lines:
+        name = line.split("=", 1)[0].strip() if "=" in line else ""
+        if name in remaining:
+            out.append(f"{name}={remaining.pop(name)}")
+        else:
+            out.append(line)
+    if out and out[-1].strip():
+        out.append("")
+    out.extend(f"{name}={value}" for name, value in remaining.items())
+
+    ENV_FILE.write_text("\n".join(out).rstrip("\n") + "\n", encoding="utf-8")
+    if not IS_WINDOWS:
+        # It holds a secret; nobody else on this machine needs to read it.
+        ENV_FILE.chmod(0o600)
+
+
+def check_ebay(client_id: str, client_secret: str, environment: str) -> bool:
+    """Ask eBay whether these keys work, and say plainly what came back.
+
+    A key pair that is merely *typed in* proves nothing. This is the one
+    question worth answering before anything else: does eBay accept them?
+    """
+    import base64
+    import json
+    import urllib.error
+    import urllib.request
+
+    host = "api.sandbox.ebay.com" if environment == "sandbox" else "api.ebay.com"
+    basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    request = urllib.request.Request(  # noqa: S310 - fixed https endpoint
+        f"https://{host}/identity/v1/oauth2/token",
+        data=b"grant_type=client_credentials&scope=https%3A%2F%2Fapi.ebay.com%2Foauth%2Fapi_scope",
+        headers={
+            "Authorization": f"Basic {basic}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+            payload = json.loads(response.read().decode())
+    except urllib.error.HTTPError as error:
+        body = error.read().decode(errors="replace")
+        say(f"  {RED}eBay rejected the keys{RESET} (HTTP {error.code}).")
+        if error.code in (400, 401):
+            say(f"  {DIM}Usually: a typo, or sandbox keys with EBAY_ENVIRONMENT=production.{RESET}")
+        detail = body[:200].replace(client_secret, "***")
+        say(f"  {DIM}{detail}{RESET}")
+        return False
+    except urllib.error.URLError as error:
+        say(f"  {YELLOW}could not reach eBay{RESET}: {error.reason}")
+        say(f"  {DIM}The keys may still be fine - this looks like a network problem.{RESET}")
+        return False
+
+    if not payload.get("access_token"):
+        say(f"  {RED}eBay returned no token.{RESET}")
+        return False
+    say(f"  {GREEN}ok{RESET} eBay accepted the keys ({environment}).")
+    return True
+
+
+def connect_ebay() -> int:
+    """Ask for the two eBay keys, store them, and verify them.
+
+    Typed in here rather than pasted into a file: the secret is not echoed,
+    does not end up in shell history, and the file is written with the right
+    permissions and no quoting to get wrong.
+    """
+    import getpass
+
+    print(f"\n{BOLD}Connect eBay{RESET}")
+    print(f"{DIM}developer.ebay.com -> your name (top right) -> Application Keys.{RESET}")
+    print(f"{DIM}Take the Production row, not Sandbox.{RESET}\n")
+
+    client_id = input("  App ID (Client ID):  ").strip()
+    # Hidden, because it is a password in everything but name.
+    client_secret = getpass.getpass("  Cert ID (Client Secret, hidden):  ").strip()
+
+    if not client_id or not client_secret:
+        fail("both keys are needed.", "Run  python3 start.py --connect-ebay  again.")
+
+    environment = "sandbox" if "-SBX-" in client_id.upper() else "production"
+    if environment == "sandbox":
+        say(f"\n  {YELLOW}note{RESET} that App ID is a sandbox key.")
+        say(f"  {DIM}Sandbox works, but holds almost no listings to find.{RESET}")
+
+    print()
+    if not check_ebay(client_id, client_secret, environment):
+        print(f"\n  {DIM}Nothing was saved. Fix the keys and run this again.{RESET}\n")
+        return 1
+
+    write_env(
+        {
+            "EBAY_CLIENT_ID": client_id,
+            "EBAY_CLIENT_SECRET": client_secret,
+            "EBAY_ENVIRONMENT": environment,
+            "EBAY_MARKETPLACE": "EBAY_DE",
+        }
+    )
+    say(f"  {GREEN}ok{RESET} saved to {ENV_FILE.name} (readable only by you).")
+    print(f"\n  Now run:  {BOLD}python3 start.py{RESET}")
+    print(f"  Then open {BOLD}Find deals{RESET} in the menu.\n")
+    return 0
+
+
 def backend_environment(
     password_override: str | None = None, *, require_login: bool = False
 ) -> dict[str, str]:
@@ -378,6 +494,11 @@ def main() -> int:
         help="print the saved sign-in details and exit",
     )
     parser.add_argument(
+        "--connect-ebay",
+        action="store_true",
+        help="enter your eBay keys, check them against eBay, and save them",
+    )
+    parser.add_argument(
         "--require-login",
         action="store_true",
         help="ask for an email and password instead of going straight in",
@@ -386,6 +507,9 @@ def main() -> int:
 
     if args.show_login:
         return show_login()
+
+    if args.connect_ebay:
+        return connect_ebay()
 
     print(f"\n{BOLD}Arbitrage platform - research mode{RESET}")
     print(f"{DIM}Real analysis. Nothing can be listed, bought or shipped.{RESET}")
