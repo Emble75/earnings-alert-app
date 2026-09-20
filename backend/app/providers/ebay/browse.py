@@ -356,6 +356,10 @@ class EbayBrowseProvider(TargetMarketplaceProvider):
             attributes={
                 "item_id": item_id,
                 "legacy_item_id": legacy,
+                # eBay's own catalogue id, present on summaries for matched
+                # listings. Grouping on it turns many listings of one product
+                # into one product, which is what makes a scan affordable.
+                "epid": payload.get("epid"),
                 "condition_id": payload.get("conditionId"),
                 "buying_options": payload.get("buyingOptions") or [],
                 "seller_feedback_percentage": (seller.get("feedbackPercentage") or None),
@@ -383,6 +387,60 @@ class EbayBrowseProvider(TargetMarketplaceProvider):
         snapshots = [self._snapshot(item, observed_at=observed_at) for item in items]
         # A listing with no usable price cannot be priced against. Dropping it
         # here keeps "no price" out of the statistics below.
+        return [s for s in snapshots if s.price is not None]
+
+    def scan_listings(
+        self,
+        *,
+        category_ids: list[str] | None = None,
+        query: str = "",
+        min_price: Decimal | None = None,
+        max_price: Decimal | None = None,
+        condition: str = "NEW",
+        offset: int = 0,
+        limit: int = 200,
+    ) -> list[ListingSnapshot]:
+        """A page of listings from a whole category, rather than one search.
+
+        This is the discovery entry point. One call returns up to 200 real
+        listings, which is what makes scanning a category affordable against a
+        daily call budget - the per-item detail lookups are the expensive part
+        and are rationed separately.
+
+        A price band is not a nicety. Below a few euros nothing survives the
+        fees, and the upper bound is the operator's capital limit; filtering at
+        eBay's end rather than ours means the budget is spent on candidates
+        that could actually qualify.
+        """
+        filters = ["buyingOptions:{FIXED_PRICE}"]
+        if condition:
+            filters.append(f"conditions:{{{condition}}}")
+        if min_price is not None or max_price is not None:
+            low = "" if min_price is None else f"{min_price}"
+            high = "" if max_price is None else f"{max_price}"
+            filters.append(f"price:[{low}..{high}]")
+            filters.append(f"priceCurrency:{self.currency}")
+
+        params: dict[str, Any] = {
+            "limit": max(1, min(limit, 200)),
+            "offset": max(0, offset),
+            "filter": ",".join(filters),
+        }
+        if category_ids:
+            params["category_ids"] = ",".join(category_ids)
+        if query.strip():
+            params["q"] = query.strip()
+        if not category_ids and not query.strip():
+            # eBay rejects a filter-only search, and a scan of everything is
+            # not something to paper over with a wildcard.
+            raise ValueError("a scan needs a category or a search term")
+
+        payload = self._request("/buy/browse/v1/item_summary/search", params)
+        observed_at = utcnow()
+        snapshots = [
+            self._snapshot(item, observed_at=observed_at)
+            for item in (payload.get("itemSummaries") or [])
+        ]
         return [s for s in snapshots if s.price is not None]
 
     def search_listings(self, query: str, *, limit: int = 20) -> list[ListingSnapshot]:

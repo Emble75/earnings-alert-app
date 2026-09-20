@@ -294,3 +294,80 @@ def test_the_ebay_lookup_returns_real_listings_when_keys_exist(api_client, auth,
     # Money crosses the API as a string, never a float.
     assert first["price"] == "279.00"
     assert first["total"] == "283.99"
+
+
+def test_the_scan_endpoint_explains_itself_without_ebay_keys(api_client, auth):
+    response = api_client.post(
+        "/api/research/scan", json={"query": "kopfhörer"}, headers=auth()
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is False
+    assert "EBAY_CLIENT_ID" in body["notes"][0]
+    assert body["candidates"] == []
+
+
+def test_the_scan_endpoint_returns_a_worklist(api_client, auth, monkeypatch):
+    """Each row is a real eBay product plus the Amazon price it must beat -
+    and never an Amazon price the system does not have."""
+    import httpx
+
+    from app.api import deps
+    from app.providers.ebay.browse import EbayBrowseProvider
+    from app.providers.readonly import ReadOnlyTargetProvider
+    from app.providers.registry import ProviderBundle, get_providers
+    from app.providers.resilience import ProviderGuard, RetryPolicy
+    from tests.test_discovery import detail, summary
+    from tests.test_ebay_browse import TOKEN_RESPONSE
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "oauth2/token" in request.url.path:
+            return httpx.Response(200, json=TOKEN_RESPONSE)
+        if "item_summary/search" in request.url.path:
+            return httpx.Response(
+                200,
+                json={
+                    "itemSummaries": [
+                        summary("111111111111", "300.00", epid="E1"),
+                        summary("222222222222", "320.00", epid="E1"),
+                        summary("333333333333", "310.00", epid="E1"),
+                    ]
+                },
+            )
+        return httpx.Response(200, json=detail("333333333333"))
+
+    browse = EbayBrowseProvider(
+        client_id="id",
+        client_secret="secret",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        guard=ProviderGuard(provider="ebay-browse", retry=RetryPolicy(attempts=1)),
+    )
+    live = get_providers()
+    bundle = ProviderBundle(
+        source=live.source,
+        target=ReadOnlyTargetProvider(browse),
+        fulfillment=live.fulfillment,
+        shipping=live.shipping,
+        execution_mode=live.execution_mode,
+        demo_mode=False,
+    )
+    api_client.app.dependency_overrides[deps.get_provider_bundle] = lambda: bundle
+    try:
+        response = api_client.post(
+            "/api/research/scan", json={"query": "kopfhörer"}, headers=auth()
+        )
+    finally:
+        api_client.app.dependency_overrides.pop(deps.get_provider_bundle, None)
+
+    body = response.json()
+    assert body["available"] is True
+    assert body["listings_seen"] == 3
+    assert body["products_found"] == 1
+
+    row = body["candidates"][0]
+    assert row["ebay_price"] == "310.00"          # the median, not the 320 high
+    assert row["item_url"] == "https://www.ebay.de/itm/333333333333"
+    assert row["ean"] == "4548736134584"
+    # The number to beat, as an exact decimal string.
+    assert Decimal(row["max_amazon_price"]) < Decimal(row["ebay_price"])
+    assert row["headroom_percent"] is not None

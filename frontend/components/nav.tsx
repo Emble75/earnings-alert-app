@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 /** What research needs, in the order you use it. */
 const RESEARCH_LINKS: Array<[string, string]> = [
+  ["/find", "Find deals"],
   ["/research", "Check a product"],
   ["/opportunities", "Opportunities"],
   ["/dashboard", "Overview"],
@@ -16,6 +17,7 @@ const RESEARCH_LINKS: Array<[string, string]> = [
 
 /** Everything, once the system is allowed to act. */
 const FULL_LINKS: Array<[string, string]> = [
+  ["/find", "Find deals"],
   ["/dashboard", "Dashboard"],
   ["/research", "Check a product"],
   ["/opportunities", "Opportunities"],

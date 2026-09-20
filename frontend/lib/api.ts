@@ -11,7 +11,7 @@ import { cookies } from "next/headers";
 import type {
   Analytics, ApprovalSummary, AuditEntry, Backtest, EbaySearchResponse, Health, Listing,
   Opportunity, OpportunityDetail, Order, OrderDetail, Page, ResearchResponse, ReturnRecord,
-  SettingsPayload, Shipment,
+  ScanResponse, SettingsPayload, Shipment,
 } from "@/types/api";
 
 export const API_BASE =
@@ -135,6 +135,13 @@ export const api = {
     query.set("limit", String(params.limit ?? 20));
     return authedRequest<EbaySearchResponse>(`/api/research/ebay?${query.toString()}`);
   },
+
+  /** Scan eBay for candidates worth pricing against Amazon. */
+  scan: (body: Record<string, unknown>) =>
+    authedRequest<ScanResponse>("/api/research/scan", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   researchTemplate: () =>
     authedRequest<{ columns: Record<string, string[]>; template_csv: string; notes: string[] }>(

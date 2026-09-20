@@ -114,6 +114,51 @@ the pages they came from.
 Shortened links (`amzn.eu/d/...`, `ebay.us/...`) are reported, not resolved:
 following one would mean fetching the page. Open it and copy the full address.
 
+## Finding candidates instead of thinking them up
+
+**Find deals** scans a slice of eBay and hands back a worklist. It needs the
+eBay keys below.
+
+The direction is deliberate. Searching Amazon for cheap things and asking
+whether eBay wants them finds plenty of cheap things nobody buys. Starting on
+eBay inverts it: a product with several sellers at similar prices is evidence
+that it sells. The only question left is what it would have to cost on Amazon,
+and that has an exact answer.
+
+So each row gives you one number - **buy below** - the most you could pay and
+still clear your minimum profit and margin, with eBay fees, postage,
+packaging, return exposure, the risk reserve and VAT already taken off. Open
+the Amazon link, compare one price, move on.
+
+| Product | Sells for | Buy below | Sellers |
+| --- | --- | --- | --- |
+| Sony WH-1000XM5 | 299.00 | **197.50** | 3 |
+| Logitech MX Keys | 104.00 | **59.23** | 2 |
+
+That figure is the profit engine run backwards - a binary search over the real
+engine, not a second copy of the formula that could drift from it. It is exact
+to the cent: at 197.50 the margin is 15.00%, at 197.51 it is 14.99% and the
+deal fails.
+
+### What the scan will not do
+
+- **It does not invent an Amazon price.** There is no free source of them, so
+  there is no column for one. You get a short list and the number to beat.
+- **It ignores products with one listing.** A single asking price says nothing
+  about what something sells for.
+- **It uses the median of the competing listings, never the highest.**
+- **It says when nothing can work.** A product selling for 8.20 cannot carry
+  the fees at any purchase price, and is reported that way rather than shown
+  with a tiny margin.
+
+### The call budget
+
+eBay allows a few thousand calls a day. One search returns 200 listings for a
+single call, but the product codes needed for matching cost one call each - so
+listings are grouped by eBay's own catalogue id first and only one
+representative per product is looked up. Twenty listings of one product cost
+one call, not twenty. "Products to look up" caps the rest.
+
 ## Letting eBay find the listing for you
 
 With two eBay application keys the **Find the listing on eBay** button returns

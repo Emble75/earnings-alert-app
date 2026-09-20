@@ -55,6 +55,34 @@ export interface EbaySearchResponse {
   listings: EbayListing[];
 }
 
+/** A product found on eBay, with the price that would make it work. */
+export interface Candidate {
+  title: string;
+  ebay_price: string;
+  listing_count: number;
+  lowest: string;
+  highest: string;
+  item_id: string;
+  item_url: string;
+  sold_url: string | null;
+  amazon_search_url: string | null;
+  ean: string | null;
+  brand: string | null;
+  model: string | null;
+  max_amazon_price: string | null;
+  impossible_reason: string | null;
+  headroom_percent: string | null;
+}
+
+export interface ScanResponse {
+  available: boolean;
+  listings_seen: number;
+  products_found: number;
+  detail_lookups: number;
+  candidates: Candidate[];
+  notes: string[];
+}
+
 export interface MarketplaceLinks {
   source_product: string | null;
   target_product: string | null;

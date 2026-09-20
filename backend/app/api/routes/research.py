@@ -22,6 +22,7 @@ from app.schemas.opportunity import (
     OpportunityOut,
     ProfitCalculationOut,
 )
+from app.services.discovery_service import DiscoveryService
 from app.services.opportunity_service import build_links
 from app.services.research_service import (
     COLUMNS,
@@ -272,3 +273,118 @@ def search_ebay(
             )
         )
     return EbaySearchOut(available=True, query=query or identifier, listings=out)
+
+
+# ---------------------------------------------------------------------------
+# Scanning for candidates
+# ---------------------------------------------------------------------------
+class CandidateOut(ApiModel):
+    """A product worth checking, and the price that would make it work."""
+
+    title: str
+    ebay_price: str
+    listing_count: int
+    lowest: str
+    highest: str
+    item_id: str
+    item_url: str
+    sold_url: str | None = None
+    amazon_search_url: str | None = None
+    ean: str | None = None
+    brand: str | None = None
+    model: str | None = None
+    #: The most you could pay on Amazon and still clear every threshold.
+    #: Null when no price works, with the reason alongside.
+    max_amazon_price: str | None = None
+    impossible_reason: str | None = None
+    headroom_percent: str | None = None
+
+
+class ScanOut(ApiModel):
+    available: bool
+    listings_seen: int = 0
+    products_found: int = 0
+    detail_lookups: int = 0
+    candidates: list[CandidateOut] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class ScanRequest(ApiModel):
+    category_ids: list[str] = Field(default_factory=list, max_length=10)
+    query: str = Field(default="", max_length=200)
+    min_price: Decimal | None = Field(default=None, ge=0)
+    max_price: Decimal | None = Field(default=None, ge=0)
+    pages: int = Field(default=1, ge=1, le=5)
+    detail_budget: int = Field(default=40, ge=1, le=200)
+
+
+@router.post("/scan", response_model=ScanOut)
+def scan(
+    payload: ScanRequest,
+    user: Operator,
+    config: BusinessSettings,
+    providers: Providers,
+) -> ScanOut:
+    """Find candidates on eBay, and say what each would have to cost on Amazon.
+
+    This produces a worklist, not verdicts. There is no free source of Amazon
+    prices, so the system does not pretend to one: for each real eBay product
+    it computes the highest Amazon price that would clear every threshold, and
+    the operator compares one number per row.
+    """
+    service = DiscoveryService(None, config, providers)
+    possible, reason = service.can_scan()
+    if not possible:
+        return ScanOut(available=False, notes=[reason or "scanning is unavailable"])
+
+    result = service.scan(
+        category_ids=payload.category_ids,
+        query=payload.query,
+        min_price=payload.min_price,
+        max_price=payload.max_price,
+        pages=payload.pages,
+        detail_budget=payload.detail_budget,
+    )
+    return ScanOut(
+        available=True,
+        listings_seen=result.listings_seen,
+        products_found=result.products_found,
+        detail_lookups=result.detail_lookups,
+        notes=result.notes,
+        candidates=[
+            CandidateOut(
+                title=candidate.title,
+                ebay_price=str(candidate.ebay_price.amount),
+                listing_count=candidate.listing_count,
+                lowest=str(candidate.lowest.amount),
+                highest=str(candidate.highest.amount),
+                item_id=candidate.item_id,
+                item_url=candidate.item_url,
+                sold_url=candidate.sold_url,
+                amazon_search_url=candidate.amazon_search_url,
+                ean=candidate.ean,
+                brand=candidate.brand,
+                model=candidate.model,
+                max_amazon_price=(
+                    str(candidate.max_amazon_price.amount)
+                    if candidate.max_amazon_price
+                    else None
+                ),
+                impossible_reason=candidate.impossible_reason,
+                headroom_percent=_headroom(candidate),
+            )
+            for candidate in result.candidates
+        ],
+    )
+
+
+def _headroom(candidate) -> str | None:
+    """What share of the eBay price is available to buy the goods with.
+
+    A useful sort at a glance: a high figure means the costs take little of
+    the sale, so the deal survives a worse Amazon price than a low one.
+    """
+    if candidate.max_amazon_price is None or not candidate.ebay_price.is_positive():
+        return None
+    share = candidate.max_amazon_price.amount / candidate.ebay_price.amount * 100
+    return str(share.quantize(Decimal("0.1")))
