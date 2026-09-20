@@ -288,7 +288,10 @@ def check_ebay(client_id: str, client_secret: str, environment: str) -> bool:
         body = error.read().decode(errors="replace")
         say(f"  {RED}eBay rejected the keys{RESET} (HTTP {error.code}).")
         if error.code in (400, 401):
-            say(f"  {DIM}Usually: a typo, or sandbox keys with EBAY_ENVIRONMENT=production.{RESET}")
+            # eBay answers a disabled keyset with the same invalid_client it
+            # uses for a wrong password, so the most common real cause cannot
+            # be told apart from a typo without looking at the portal.
+            say(f"  {DIM}eBay says this only as 'invalid_client', whatever the cause.{RESET}")
         detail = body[:200].replace(client_secret, "***")
         say(f"  {DIM}{detail}{RESET}")
         return False
@@ -342,15 +345,23 @@ def key_problems(client_id: str, client_secret: str) -> list[str]:
 #: every one of these with the same "client authentication failed", so the
 #: list has to come from us.
 REJECTION_HELP = [
-    "Things to check, in this order:",
-    "  1. The App ID and Cert ID must be from the SAME row on eBay.",
-    "     The Production row has its own pair; Sandbox has another.",
-    "  2. Make sure you copied the Cert ID, not the Dev ID beside it.",
-    "  3. Compare the character counts above against the eBay page, in case",
+    "Check these, in this order:",
+    "",
+    "  1. IS THE KEYSET DISABLED? Open developer.ebay.com -> Application",
+    "     Keys and look at the Production block. A banner reading 'Your",
+    "     keyset is currently disabled' is the usual cause, and has nothing",
+    "     to do with the keys themselves: eBay requires every production",
+    "     application to handle marketplace account deletion notifications,",
+    "     or to hold an exemption from that requirement.",
+    "",
+    "     An exemption is the route that fits this system, which reads public",
+    "     listings and stores no eBay user data - but describe your own use",
+    "     and let eBay decide.",
+    "",
+    "  2. The App ID and Cert ID must be from the SAME row on eBay.",
+    "  3. Make sure you copied the Cert ID, not the Dev ID beside it.",
+    "  4. Compare the character counts above against the eBay page, in case",
     "     a value pasted incompletely.",
-    "  4. Confirm it is not eBay's side: on the Application Keys page, use",
-    "     eBay's own 'Get a Token' / OAuth test. If that fails too, the",
-    "     keyset is the problem, not this program.",
 ]
 
 

@@ -183,6 +183,21 @@ crucially, the item number - and one click fills the eBay side of the form.
 
 4. Restart. `/api/health` will report the eBay provider as `ebay-browse`.
 
+### "Your keyset is currently disabled"
+
+A new production keyset is disabled until the application either handles
+eBay's **marketplace account deletion / account closure notifications** or holds
+an **exemption** from that requirement. Until then eBay refuses the keys with
+`invalid_client` - the same answer it gives for a wrong password, which makes
+this look like a typo when it is not. The banner on the Application Keys page
+is what distinguishes them.
+
+Handling the notifications means running an HTTPS endpoint that eBay can reach,
+which a laptop is not. The exemption is the route that fits a local research
+install: it reads public listings through the Browse API with an application
+token, and holds no eBay user data at all - no buyer names, no addresses, no
+user tokens. Describe your own use when applying; eBay decides.
+
 Sandbox is worth setting up while production is pending, but be clear about
 what it is: an empty shop. It proves the wiring works. It will not find you a
 product to trade, because there is almost nothing listed in it.
