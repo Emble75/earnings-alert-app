@@ -328,16 +328,6 @@ def key_problems(client_id: str, client_secret: str) -> list[str]:
             "the App ID normally has several dashes, like "
             "Name-Appname-PRD-xxxxxxxxx-xxxxxxxx. Yours looks short."
         )
-    # The last block is the one that gets clipped, because a copy that stops
-    # early still looks like a complete key: eBay's tail is 12 characters,
-    # and the four before it are 4 each, so a short tail reads as plausible.
-    tail = client_secret.rsplit("-", 1)[-1]
-    if client_secret.upper().startswith(("PRD-", "SBX-")) and len(tail) < 12:
-        problems.append(
-            f"the Cert ID ends in a {len(tail)}-character block ({tail}). eBay's "
-            "end in 12, so this one looks cut short - check the end of the value "
-            "on eBay and copy it again."
-        )
     id_is_production = "-PRD-" in client_id.upper()
     secret_is_production = client_secret.upper().startswith("PRD-")
     if id_is_production != secret_is_production:
@@ -348,14 +338,19 @@ def key_problems(client_id: str, client_secret: str) -> list[str]:
     return problems
 
 
-#: What actually goes wrong, in the order it usually goes wrong.
+#: What actually goes wrong, in the order it usually goes wrong. eBay answers
+#: every one of these with the same "client authentication failed", so the
+#: list has to come from us.
 REJECTION_HELP = [
-    "Three things to check, in this order:",
-    "  1. The Cert ID may have pasted incompletely. Compare the character",
-    "     count above with the value on eBay - it is long and easy to clip.",
-    "  2. The App ID and Cert ID must be from the SAME row on eBay.",
+    "Things to check, in this order:",
+    "  1. The App ID and Cert ID must be from the SAME row on eBay.",
     "     The Production row has its own pair; Sandbox has another.",
-    "  3. Make sure you copied the Cert ID, not the Dev ID next to it.",
+    "  2. Make sure you copied the Cert ID, not the Dev ID beside it.",
+    "  3. Compare the character counts above against the eBay page, in case",
+    "     a value pasted incompletely.",
+    "  4. Confirm it is not eBay's side: on the Application Keys page, use",
+    "     eBay's own 'Get a Token' / OAuth test. If that fails too, the",
+    "     keyset is the problem, not this program.",
 ]
 
 
