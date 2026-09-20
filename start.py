@@ -304,6 +304,61 @@ def check_ebay(client_id: str, client_secret: str, environment: str) -> bool:
     return True
 
 
+def masked(secret: str) -> str:
+    """Enough of a secret to recognise it by, and no more."""
+    if len(secret) <= 8:
+        return "too short to be right"
+    return f"{secret[:4]}...{secret[-4:]}"
+
+
+def key_problems(client_id: str, client_secret: str) -> list[str]:
+    """Shape checks that catch the mistakes eBay only reports as "failed".
+
+    eBay answers a wrong key pair with one opaque message, so anything we can
+    tell from the values themselves is worth saying before the round trip.
+    """
+    problems = []
+    if not client_secret.upper().startswith(("PRD-", "SBX-")):
+        problems.append(
+            "the Cert ID normally starts with PRD- or SBX-. If yours does not, "
+            "you may have copied the Dev ID, which is the row below it."
+        )
+    if client_id.count("-") < 3:
+        problems.append(
+            "the App ID normally has several dashes, like "
+            "Name-Appname-PRD-xxxxxxxxx-xxxxxxxx. Yours looks short."
+        )
+    # The last block is the one that gets clipped, because a copy that stops
+    # early still looks like a complete key: eBay's tail is 12 characters,
+    # and the four before it are 4 each, so a short tail reads as plausible.
+    tail = client_secret.rsplit("-", 1)[-1]
+    if client_secret.upper().startswith(("PRD-", "SBX-")) and len(tail) < 12:
+        problems.append(
+            f"the Cert ID ends in a {len(tail)}-character block ({tail}). eBay's "
+            "end in 12, so this one looks cut short - check the end of the value "
+            "on eBay and copy it again."
+        )
+    id_is_production = "-PRD-" in client_id.upper()
+    secret_is_production = client_secret.upper().startswith("PRD-")
+    if id_is_production != secret_is_production:
+        problems.append(
+            "one key looks like Production and the other like Sandbox. They must "
+            "both come from the same row."
+        )
+    return problems
+
+
+#: What actually goes wrong, in the order it usually goes wrong.
+REJECTION_HELP = [
+    "Three things to check, in this order:",
+    "  1. The Cert ID may have pasted incompletely. Compare the character",
+    "     count above with the value on eBay - it is long and easy to clip.",
+    "  2. The App ID and Cert ID must be from the SAME row on eBay.",
+    "     The Production row has its own pair; Sandbox has another.",
+    "  3. Make sure you copied the Cert ID, not the Dev ID next to it.",
+]
+
+
 def connect_ebay() -> int:
     """Ask for the two eBay keys, store them, and verify them.
 
@@ -324,14 +379,25 @@ def connect_ebay() -> int:
     if not client_id or not client_secret:
         fail("both keys are needed.", "Run  python3 start.py --connect-ebay  again.")
 
+    # A hidden prompt gives no feedback, so a paste that dropped half the
+    # value looks exactly like one that worked. Echoing the shape - never the
+    # value - is what makes that visible.
+    say(f"\n  read: App ID {len(client_id)} characters, "
+        f"Cert ID {len(client_secret)} characters ({masked(client_secret)})")
+    for problem in key_problems(client_id, client_secret):
+        say(f"  {YELLOW}?{RESET} {problem}")
+
     environment = "sandbox" if "-SBX-" in client_id.upper() else "production"
     if environment == "sandbox":
-        say(f"\n  {YELLOW}note{RESET} that App ID is a sandbox key.")
+        say(f"  {YELLOW}note{RESET} that App ID is a sandbox key.")
         say(f"  {DIM}Sandbox works, but holds almost no listings to find.{RESET}")
 
     print()
     if not check_ebay(client_id, client_secret, environment):
-        print(f"\n  {DIM}Nothing was saved. Fix the keys and run this again.{RESET}\n")
+        print()
+        for line in REJECTION_HELP:
+            say(f"  {line}")
+        print(f"\n  {DIM}Nothing was saved. Run the command again to retry.{RESET}\n")
         return 1
 
     write_env(
