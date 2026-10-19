@@ -491,9 +491,11 @@ export function buildOpenDataset(input: OpenDataInput, generatedAt: string): Dat
           if (later) {
             const to = lastSeasonWhenLeaving(later.year, later.winter);
             if (to >= open.year) emit(open.year, to, 'season');
-          } else if (open.year >= DATA_END_SEASON - 4)
-            emit(open.year, null, 'season'); // recent arrival, no later move: still there
-          else emit(open.year, open.year, 'year'); // end unknown → club-only validity
+          } else {
+            // No departure on record: every exit (transfer, loan, free agent, retirement) is listed in the
+            // archive, so the player is still there at the end of the data. Long tenures must count for leagues.
+            emit(open.year, null, 'season');
+          } // end unknown → club-only validity
         }
       }
       // Clubs outside the covered leagues, known only as a transfer counterpart (dates unknown).

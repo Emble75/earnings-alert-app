@@ -252,7 +252,7 @@ describe('open-data career reconstruction', () => {
       aff.map((a) => `${a.teamId}:${a.fromSeason}-${a.toSeason}:${a.precision}`).sort(),
     ).toEqual([
       'tm-c-chelsea-fc:2010-2010:season',
-      'tm-c-chelsea-fc:2012-2012:year',
+      'tm-c-chelsea-fc:2012-null:season',
       'tm-c-everton-fc:2011-2011:season',
     ]);
   });

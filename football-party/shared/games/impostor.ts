@@ -15,7 +15,7 @@ export const ImpostorConfigSchema = z.object({
   /** In-person play: clues are said aloud, so the app only tracks whose turn it is (no typing). */
   spoken: z.boolean().default(false),
   impostors: z.number().int().min(1).max(3).default(1),
-  rounds: z.number().int().min(1).max(8).default(3),
+  rounds: z.number().int().min(1).max(99).default(3),
   clueRounds: z.number().int().min(1).max(3).default(2),
   clueSeconds: z.number().int().min(10).max(90).default(25),
   discussionSeconds: z.number().int().min(15).max(300).default(60),
@@ -31,7 +31,6 @@ export const ImpostorActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('clue'), text: z.string().max(80) }),
   z.object({ type: z.literal('vote'), target: z.string().max(64) }), // player id or 'skip'
   z.object({ type: z.literal('advance') }), // host: skip the current waiting phase
-  z.object({ type: z.literal('accuse'), target: z.string().max(64) }), // in-person: the group's verdict (player id or 'skip')
 ]);
 export type ImpostorAction = z.infer<typeof ImpostorActionSchema>;
 
@@ -210,6 +209,9 @@ function startRound(
 }
 
 function beginClues(s: ImpostorState, ctx: GameContext): ImpostorState {
+  // In-person play has no clue rounds: once everyone has seen their card, the table just talks.
+  if (s.config.spoken)
+    return { ...s, phase: 'discussion', deadline: dl(s.config, ctx, s.config.discussionSeconds) };
   const order = shuffle(s.participants, ctx.rng);
   return {
     ...s,
@@ -237,6 +239,23 @@ function advanceTurn(s: ImpostorState, ctx: GameContext): ImpostorState {
 }
 
 function computeResult(s: ImpostorState, ctx: GameContext): ImpostorState {
+  if (s.config.spoken) {
+    // In-person play has no votes and no points: the table just reveals the answer.
+    return {
+      ...s,
+      phase: 'result',
+      deadline: null,
+      result: {
+        footballer: { id: s.secret.footballerId, name: s.secret.name },
+        impostors: s.secret.impostors,
+        tally: {},
+        votes: {},
+        ejected: null,
+        crewWon: false,
+        deltas: {},
+      },
+    };
+  }
   const tally: Record<string, number> = {};
   for (const [, target] of Object.entries(s.votes)) {
     if (target !== 'skip') tally[target] = (tally[target] ?? 0) + 1;
@@ -336,7 +355,8 @@ function settle(s: ImpostorState, ctx: GameContext): ImpostorState {
               },
           ctx,
         );
-      } else if (cur.phase === 'discussion')
+      } else if (cur.phase === 'discussion' && cur.config.spoken) cur = computeResult(cur, ctx);
+      else if (cur.phase === 'discussion')
         cur = {
           ...cur,
           phase: 'voting',
@@ -414,21 +434,10 @@ export const impostorGame: GameModule<ImpostorConfig, ImpostorState, ImpostorAct
           s.votes[actorId] = action.target;
           return settle(s, ctx);
         }
-        case 'accuse': {
-          // In-person verdict: the group points at someone and the phone holder taps them.
-          if (!s.config.spoken || s.phase !== 'voting')
-            throw new GameError('wrong-phase', 'There is no group verdict to give right now.');
-          if (action.target !== 'skip' && !s.participants.includes(action.target))
-            throw new GameError('invalid-vote', 'Unknown player.');
-          for (const p of s.participants) {
-            // Everyone except the accused (and the impostors, who bluff) "voted" for the group's pick.
-            s.votes[p] =
-              p === action.target || s.secret.impostors.includes(p) ? 'skip' : action.target;
-          }
-          return settle(computeResult(s, ctx), ctx);
-        }
         case 'advance': {
           // Host-only: enforced by the room engine through `hostOnly`.
+          if (s.phase === 'discussion' && s.config.spoken)
+            return settle(computeResult(s, ctx), ctx);
           if (s.phase === 'discussion') {
             s.phase = 'voting';
             s.deadline = patient(s.config) ? null : dl(s.config, ctx, s.config.voteSeconds);
@@ -447,7 +456,7 @@ export const impostorGame: GameModule<ImpostorConfig, ImpostorState, ImpostorAct
       }
     },
 
-    hostOnly: (a) => a.type === 'advance' || a.type === 'accuse',
+    hostOnly: (a) => a.type === 'advance',
     tick: (state, ctx) => settle(state, ctx),
     sync: (state, ctx) => settle(state, ctx),
     deadline: (s) => s.deadline,

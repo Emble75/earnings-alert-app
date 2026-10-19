@@ -56,7 +56,7 @@ type Check = {
   player: string;
   kind: 'club' | 'national' | 'league';
   target: string;
-  expect: boolean;
+  expect: boolean | 'beyond-data';
 };
 const checks: Check[] = [
   // `target` may list alternative spellings separated by "|" (sources name clubs differently).
@@ -115,6 +115,10 @@ const checks: Check[] = [
   { player: 'Paul Pogba', kind: 'club', target: 'Juventus|Juventus FC', expect: true },
   { player: 'Paul Pogba', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
 ];
+// User-reported cases live in data/golden-facts.json so every fixed error stays fixed.
+import fs from 'node:fs';
+if (fs.existsSync('data/golden-facts.json'))
+  checks.push(...(JSON.parse(fs.readFileSync('data/golden-facts.json', 'utf8')).facts as Check[]));
 const findTeam = (names: string, kind: 'club' | 'national') => {
   for (const n of names.split('|')) {
     const t = ds.teams.find((x) => x.kind === kind && normalizeText(x.name) === normalizeText(n));
@@ -146,7 +150,7 @@ for (const c of checks) {
       : findTeam(c.target, c.kind)
         ? idx.criterionFor(c.kind, findTeam(c.target, c.kind)!.id)
         : null;
-  const label = `${c.player} · ${c.kind} · ${c.target} → expect ${c.expect ? 'VALID' : 'INVALID'}`;
+  const label = `${c.player} · ${c.kind} · ${c.target} → expect ${c.expect === true ? 'VALID' : c.expect === false ? 'INVALID' : 'beyond data'}`;
   if (!p || normalizeText(p.name).split(' ').pop() !== normalizeText(c.player).split(' ').pop()) {
     line(`  ·  NOT IN DATA  ${label} (player)`);
     skip++;
@@ -158,6 +162,13 @@ for (const c of checks) {
     continue;
   }
   const ok = idx.verdict(p.id, crit).ok;
+  if (c.expect === 'beyond-data') {
+    line(
+      `  ○  AFTER DATA END ${label.replace('expect INVALID', '')} ${ok ? '(valid!)' : '(true in real life, but happened after the data ends)'}`,
+    );
+    skip++;
+    continue;
+  }
   // An expected-INVALID answer is only meaningful as "correctly rejected"; an expected-VALID miss is a coverage gap, not a wrong fact.
   if (ok === c.expect) {
     line(`  ✓  PASS         ${label}`);

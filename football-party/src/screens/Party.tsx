@@ -36,7 +36,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
   const [vsComputer, setVsComputer] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [rounds, setRounds] = useState<1 | 3 | 5>(1);
-  const [impRounds, setImpRounds] = useState(2);
+  const [discSecs, setDiscSecs] = useState(180);
   const [timersOn, setTimersOn] = useState(true);
   const [secs, setSecs] = useState(45);
   const hint = 'position' as const; // the impostor gets a position hint
@@ -66,13 +66,10 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
         game,
         names: clean,
         config: {
-          rounds: impRounds,
-          clueRounds: 1,
-          spoken: true, // in person: clues are said aloud, no typing
+          rounds: 99, // endless: "Next round" until you stop
+          spoken: true, // in person: see your card, talk, reveal — no clue rounds or voting
           timers: timersOn,
-          clueSeconds: secs,
-          discussionSeconds: 90,
-          voteSeconds: 60,
+          discussionSeconds: discSecs,
           impostors: Math.min(impostors, impCap),
           impostorHint: hint,
         },
@@ -230,11 +227,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
                 />
               </div>
             </div>
-          ) : (
-            <div className="config-grid">
-              <Stepper label="Rounds" value={impRounds} min={1} max={5} onChange={setImpRounds} />
-            </div>
-          )}
+          ) : null}
           <div className="config-grid" style={{ marginTop: 'var(--s-3)' }}>
             <div className="span-2">
               <Segmented
@@ -249,15 +242,27 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
             </div>
             {timersOn && (
               <div className="span-2">
-                <Stepper
-                  label={game === 'tictactoe' ? 'Seconds per turn' : 'Seconds per clue'}
-                  value={secs}
-                  min={10}
-                  max={180}
-                  step={5}
-                  suffix="s"
-                  onChange={setSecs}
-                />
+                {game === 'tictactoe' ? (
+                  <Stepper
+                    label="Seconds per turn"
+                    value={secs}
+                    min={10}
+                    max={180}
+                    step={5}
+                    suffix="s"
+                    onChange={setSecs}
+                  />
+                ) : (
+                  <Stepper
+                    label="Discussion time"
+                    value={discSecs}
+                    min={30}
+                    max={600}
+                    step={30}
+                    suffix="s"
+                    onChange={setDiscSecs}
+                  />
+                )}
               </div>
             )}
           </div>

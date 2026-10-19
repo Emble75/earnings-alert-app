@@ -296,105 +296,49 @@ describe('impostor with timers switched off', () => {
   });
 });
 
-describe('impostor with spoken clues (in-person play)', () => {
-  it('rejects typed clues and advances speakers via the host; no clue text is stored', () => {
-    const { room, env } = startedRoom(['ana', 'ben', 'cy'], {
-      spoken: true,
-      clueRounds: 1,
-      rounds: 1,
-    });
-    toClues(room, env);
-    const first = state(room).turnOrder[0]!;
-    expect(() => act(room, first, { type: 'clue', text: 'left foot' }, env)).toThrowError(
-      /out loud/,
-    );
-    const view = buildRoomView(room, 'ana', env).game!.view as {
-      turnOrder: string[];
-      turnIndex: number;
-    };
-    expect(view.turnOrder).toHaveLength(3);
-    for (let i = 0; i < 3; i++) applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
-    expect(state(room).phase).toBe('discussion');
-    expect(state(room).clues).toEqual([]);
-  });
+describe('impostor in person (one phone): cards → discussion → reveal', () => {
+  const inPerson = (config: Record<string, unknown> = {}) =>
+    startedRoom(['ana', 'ben', 'cy', 'dee'], { spoken: true, rounds: 99, ...config });
 
-  it('still times a speaker out when timers are on, without recording a "ran out of time" clue', () => {
-    const { room, env } = startedRoom(['ana', 'ben', 'cy'], {
-      spoken: true,
-      clueRounds: 1,
-      clueSeconds: 10,
-    });
-    toClues(room, env);
-    advanceMany(room, env, 10_500, 500);
-    expect(state(room).turnIndex).toBe(1);
-    expect(state(room).clues).toEqual([]);
-  });
-});
-
-describe('impostor group verdict (in-person)', () => {
-  const inPerson = () =>
-    startedRoom(['ana', 'ben', 'cy', 'dee'], {
-      spoken: true,
-      timers: false,
-      clueRounds: 1,
-      rounds: 1,
-    });
-  const toVerdict = (room: Room, env: ReturnType<typeof makeEnv>) => {
-    toClues(room, env);
-    for (let i = 0; i < 4; i++) applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
-    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env); // discussion → verdict
-    expect(state(room).phase).toBe('voting');
-    expect(state(room).deadline).toBeNull();
-  };
-
-  it('scores the group pick: correct accusation → crew +3, impostor 0', () => {
-    const { room, env } = inPerson();
-    toVerdict(room, env);
-    const impostor = state(room).secret.impostors[0]!;
-    applyCommand(room, 'ana', cmd.act({ type: 'accuse', target: impostor }), env);
-    const res = state(room).result!;
-    expect(state(room).phase).toBe('result');
-    expect(res.ejected).toBe(impostor);
-    expect(res.crewWon).toBe(true);
-    for (const p of room.players) expect(res.deltas[p.id] ?? 0).toBe(p.id === impostor ? 0 : 3);
-    expect(state(room).deadline).toBeNull(); // in person: waits for the group
-  });
-
-  it('wrong accusation lets the impostor win; "no majority" ejects nobody', () => {
-    const a = inPerson();
-    toVerdict(a.room, a.env);
-    const imp = state(a.room).secret.impostors[0]!;
-    const innocent = a.room.players.map((p) => p.id).find((id) => id !== imp)!;
-    applyCommand(a.room, 'ana', cmd.act({ type: 'accuse', target: innocent }), a.env);
-    expect(state(a.room).result!.crewWon).toBe(false);
-    expect(state(a.room).result!.deltas[imp]).toBeGreaterThanOrEqual(3);
-
-    const b = inPerson();
-    toVerdict(b.room, b.env);
-    applyCommand(b.room, 'ana', cmd.act({ type: 'accuse', target: 'skip' }), b.env);
-    expect(state(b.room).result!.ejected).toBeNull();
-  });
-
-  it('rejects accusations outside in-person voting, from non-hosts, and for unknown players', () => {
-    const online = startedRoom(['ana', 'ben', 'cy']);
-    toClues(online.room, online.env);
-    expect(() =>
-      applyCommand(online.room, 'ana', cmd.act({ type: 'accuse', target: 'ben' }), online.env),
-    ).toThrowError(/no group verdict/i);
-    const { room, env } = inPerson();
-    toVerdict(room, env);
-    expect(() =>
-      applyCommand(room, 'ben', cmd.act({ type: 'accuse', target: 'cy' }), env),
-    ).toThrowError(/host/);
-    expect(() =>
-      applyCommand(room, 'ana', cmd.act({ type: 'accuse', target: 'ghost' }), env),
-    ).toThrow(GameError);
-  });
-
-  it('waits for every card to be seen: no auto-start of the round', () => {
-    const { room, env } = inPerson();
-    expect(state(room).deadline).toBeNull();
+  it('goes straight from the last card to the discussion: no clue rounds, no voting, no scoring', () => {
+    const { room, env } = inPerson({ timers: false });
+    expect(state(room).deadline).toBeNull(); // everyone must see their card first
     advanceMany(room, env, 600_000, 5000);
     expect(state(room).phase).toBe('reveal');
+    toClues(room, env); // every player confirms their card
+    expect(state(room).phase).toBe('discussion');
+    expect(state(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000);
+    expect(state(room).phase).toBe('discussion'); // waits until someone reveals
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    expect(state(room).phase).toBe('result');
+    const res = state(room).result!;
+    expect(res.footballer.name).toBe(state(room).secret.name);
+    expect(res.impostors).toEqual(state(room).secret.impostors);
+    expect(res.deltas).toEqual({});
+    expect(Object.values(state(room).scores).every((n) => n === 0)).toBe(true);
+    expect(state(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000);
+    expect(state(room).phase).toBe('result'); // waits for "next round"
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    expect(state(room).round).toBe(2);
+    expect(state(room).phase).toBe('reveal');
+    expect(state(room).usedFootballers).toHaveLength(2);
+  });
+
+  it('with timers on, the discussion counts down and reveals by itself', () => {
+    const { room, env } = inPerson({ timers: true, discussionSeconds: 60 });
+    toClues(room, env);
+    expect(state(room).phase).toBe('discussion');
+    expect(state(room).deadline! - env.now).toBe(60_000);
+    advanceMany(room, env, 61_000, 1000);
+    expect(state(room).phase).toBe('result');
+  });
+
+  it('only the host (the phone holder) can reveal; typed clues do not exist in person', () => {
+    const { room, env } = inPerson({ timers: false });
+    toClues(room, env);
+    expect(() => applyCommand(room, 'ben', cmd.act({ type: 'advance' }), env)).toThrowError(/host/);
+    expect(() => act(room, 'ben', { type: 'clue', text: 'x' }, env)).toThrow(GameError);
   });
 });

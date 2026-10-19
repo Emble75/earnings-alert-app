@@ -1,0 +1,34 @@
+{
+  "_comment": "Known-true facts used by `npm run data:report`. Add every wrong answer you find here: it becomes a permanent regression check. expect: true = must be valid, false = must be rejected, 'beyond-data' = true in real life but after the data ends (reported, not failed).",
+  "facts": [
+    { "player": "Ashley Young", "kind": "league", "target": "Premier League", "expect": true },
+    { "player": "Ashley Young", "kind": "club", "target": "Inter Milan|Inter", "expect": true },
+    { "player": "Lucas Vázquez", "kind": "club", "target": "Real Madrid", "expect": true },
+    {
+      "player": "Lucas Vázquez",
+      "kind": "league",
+      "target": "Primera Division|La Liga",
+      "expect": true
+    },
+    { "player": "Lucas Vázquez", "kind": "national", "target": "Spain", "expect": true },
+    {
+      "player": "Lucas Vázquez",
+      "kind": "league",
+      "target": "1 Bundesliga|Bundesliga",
+      "expect": "beyond-data"
+    },
+    { "player": "Jorge Meré", "kind": "club", "target": "1. FC Köln|FC Köln", "expect": true },
+    {
+      "player": "Jorge Meré",
+      "kind": "league",
+      "target": "1 Bundesliga|Bundesliga",
+      "expect": true
+    },
+    {
+      "player": "Jorge Meré",
+      "kind": "league",
+      "target": "Primera Division|La Liga",
+      "expect": true
+    }
+  ]
+}

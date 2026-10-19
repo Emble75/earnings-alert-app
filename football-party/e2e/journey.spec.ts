@@ -261,41 +261,56 @@ test('one-phone party: three friends share the phone in Tic-Tac-Toe (teams alter
   await page.context().close();
 });
 
-test('one-phone party: Impostor deals cards one tap at a time, clues are spoken, the group decides', async ({
+test('one-phone party: Impostor deals cards one tap at a time, then discussion and reveal', async ({
   browser,
 }, info) => {
   const page = await newPlayer(browser, info.project.use);
   await page.goto('/party/impostor');
   await page.getByRole('radio', { name: 'Off — take your time' }).click();
   await page.getByRole('button', { name: /kick off/i }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0); // no hand-over screens at all
+  await expect(page.getByRole('dialog')).toHaveCount(0); // no hand-over screens
   let secret = '';
   const seen: string[] = [];
   for (let i = 1; i <= 3; i++) {
-    // face-down card shows only the player's name; nothing of the previous secret is in the page
-    await expect(
-      page.getByRole('button', { name: new RegExp(`player ${i}.*tap to see`, 'i') }),
-    ).toBeVisible();
+    // the face-down card shows only the player's name; nothing of the previous secret is in the page
+    const card = page.getByRole('button', { name: new RegExp(`player ${i}.*tap to see`, 'i') });
+    await expect(card).toBeVisible();
     if (secret) expect(await page.content()).not.toContain(secret);
-    await page.getByRole('button', { name: new RegExp(`player ${i}.*tap to see`, 'i') }).click();
+    await card.click();
     const imp = (await page.locator('.deal-card.is-impostor').count()) > 0;
     seen.push(imp ? 'impostor' : 'crew');
     if (!imp) secret = (await page.locator('.deal-card .role-big.name').innerText()).trim();
     await page.getByRole('button', { name: /got it — pass the phone on/i }).click();
   }
   expect(seen.filter((x) => x === 'impostor')).toHaveLength(1);
-  // Clues are said out loud: no text box, just "next speaker".
-  await expect(page.getByText(/give your clue/i).first()).toBeVisible();
-  await expect(page.getByRole('textbox')).toHaveCount(0);
+  // untimed: explicit "Start discussion", then "Reveal" whenever the table is ready
   await expect(page.getByText(secret)).toHaveCount(0);
-  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /done — /i }).click();
-  await expect(page.getByRole('heading', { name: /half-time/i })).toBeVisible();
-  await page.getByRole('button', { name: /skip to voting/i }).click();
-  // The group points; one tap on the phone gives the verdict.
-  await page.getByRole('radio', { name: /player 1/i }).click();
+  await page.getByRole('button', { name: /start discussion/i }).click();
+  await expect(page.getByRole('textbox')).toHaveCount(0);
   await page.getByRole('button', { name: /^reveal$/i }).click();
   await expect(page.getByText('The footballer was')).toBeVisible();
   await expect(page.getByText(secret).first()).toBeVisible();
+  await page.getByRole('button', { name: /next round/i }).click();
+  await expect(page.getByRole('button', { name: /player 1.*tap to see/i })).toBeVisible();
+  await page.context().close();
+});
+
+test('one-phone party: timed Impostor discussion starts right away and reveals by itself', async ({
+  browser,
+}, info) => {
+  const page = await newPlayer(browser, info.project.use);
+  await page.goto('/party/impostor');
+  // shorten the timer to the minimum so the test stays fast: 30s is the lowest the stepper allows
+  for (let i = 0; i < 5; i++)
+    await page.getByRole('button', { name: /decrease discussion time/i }).click();
+  await page.getByRole('button', { name: /kick off/i }).click();
+  for (let i = 1; i <= 3; i++) {
+    await page.getByRole('button', { name: new RegExp(`player ${i}.*tap to see`, 'i') }).click();
+    await page.getByRole('button', { name: /got it — pass the phone on/i }).click();
+  }
+  await expect(page.getByRole('button', { name: /start discussion/i })).toHaveCount(0); // timed: no extra step
+  await expect(page.getByText(/phase time left/i)).toBeVisible();
+  await expect(page.getByText('The footballer was')).toBeVisible({ timeout: 40_000 });
   await page.context().close();
 });
 

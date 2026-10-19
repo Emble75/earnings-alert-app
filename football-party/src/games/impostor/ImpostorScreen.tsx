@@ -84,17 +84,14 @@ export function ImpostorScreen({ ctl }: { ctl: RoomController }) {
         ) : (
           <RevealPhase ctl={ctl} v={v} act={act} />
         ))}
-      {v.phase === 'clues' && v.config.spoken && <SpokenCluesPhase ctl={ctl} v={v} act={act} />}
-      {v.phase === 'clues' && !v.config.spoken && (
-        <CluesPhase ctl={ctl} v={v} act={act} isHost={isHost} />
-      )}
-      {v.phase === 'discussion' && <DiscussionPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
-      {v.phase === 'voting' &&
+      {v.phase === 'clues' && <CluesPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
+      {v.phase === 'discussion' &&
         (v.config.spoken ? (
-          <GroupVerdict ctl={ctl} v={v} act={act} />
+          <SpokenDiscussion v={v} act={act} />
         ) : (
-          <VotingPhase ctl={ctl} v={v} act={act} isHost={isHost} />
+          <DiscussionPhase ctl={ctl} v={v} act={act} isHost={isHost} />
         ))}
+      {v.phase === 'voting' && <VotingPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
       {v.phase === 'result' && (
         <>
           <ResultCard ctl={ctl} v={v} />
@@ -230,43 +227,32 @@ function RoleDeal({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: 
   );
 }
 
-/** In-person: the group points at someone; the phone holder taps that name. */
-function GroupVerdict({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
-  const { view } = ctl;
-  const [pick, setPick] = useState<string | null>(null);
+/** In-person: no clue rounds, no voting. Cards are seen, then the table talks and reveals whenever it likes. */
+function SpokenDiscussion({ v, act }: { v: ImpostorView; act: Act }) {
+  const timed = v.config.timers;
+  const [started, setStarted] = useState(timed); // timed games start talking immediately
   return (
-    <div className="stack">
-      <p className="lede">
-        Time to decide. Everyone points at who they think the impostor is — then tap the person most
-        of you picked.
-      </p>
-      <div className="vote-grid" role="radiogroup" aria-label="Who did the group pick?">
-        {v.participants.map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="radio"
-            aria-checked={pick === id}
-            className={`vote-card ${pick === id ? 'picked' : ''}`}
-            onClick={() => setPick(id)}
-          >
-            <Avatar id={id} name={nameOf(view, id)} size={48} />
-            <span className="vote-name">{nameOf(view, id)}</span>
-          </button>
-        ))}
-      </div>
-      <div className="row wrap">
-        <Button
-          size="lg"
-          disabled={!pick}
-          onClick={() => pick && act(gameAction({ type: 'accuse', target: pick }))}
-        >
-          <Gavel aria-hidden size={20} /> Reveal
-        </Button>
-        <Button variant="ghost" onClick={() => act(gameAction({ type: 'accuse', target: 'skip' }))}>
-          <UserX aria-hidden size={18} /> No clear majority
-        </Button>
-      </div>
+    <div className="deal">
+      {!started ? (
+        <>
+          <p className="lede">Everyone has seen their card. Ready to talk?</p>
+          <Button size="lg" block onClick={() => setStarted(true)}>
+            Start discussion
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="lede">
+            Talk it out — hint at the footballer without saying the name. Who is bluffing?
+          </p>
+          <Button size="lg" block onClick={() => act(gameAction({ type: 'advance' }))}>
+            <Gavel aria-hidden size={20} /> Reveal
+          </Button>
+          {timed && (
+            <p className="field-hint">The answer is revealed automatically when time is up.</p>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -348,55 +334,6 @@ function ClueList({ ctl, v }: { ctl: RoomController; v: ImpostorView }) {
           </div>
         );
       })}
-    </div>
-  );
-}
-
-/** In-person play: nobody types. The app just shows who speaks next and moves the turn along. */
-function SpokenCluesPhase({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
-  const { view } = ctl;
-  const speaker = nameOf(view, v.turnPlayerId);
-  const last = v.turnIndex >= v.turnOrder.length - 1;
-  return (
-    <div className="two-col">
-      <div className="stack">
-        <div className="turn-banner mine">
-          <Avatar id={v.turnPlayerId ?? ''} name={speaker} size={52} />
-          <div>
-            <div className="eyebrow">Say it out loud</div>
-            <div className="turn-name">{speaker}, give your clue</div>
-          </div>
-        </div>
-        <Live>{`${speaker} is giving a clue out loud.`}</Live>
-        <p className="lede">
-          One word or a short phrase — never the name. Everyone else listens for clues that fit… or
-          try too hard.
-        </p>
-        <Button size="lg" onClick={() => act(gameAction({ type: 'advance' }))}>
-          <SkipForward aria-hidden size={20} />{' '}
-          {last ? 'Done — on to the discussion' : 'Done — next speaker'}
-        </Button>
-        <p className="field-hint">
-          Lap {v.clueRound} of {v.clueRounds}.
-        </p>
-      </div>
-      <aside className="card" aria-label="Speaking order">
-        <div className="eyebrow">Speaking order · lap {v.clueRound}</div>
-        <ol className="speak-order">
-          {v.turnOrder.map((id, i) => (
-            <li key={id} className={i === v.turnIndex ? 'now' : i < v.turnIndex ? 'done' : ''}>
-              <Avatar id={id} name={nameOf(view, id)} size={28} />
-              <span>{nameOf(view, id)}</span>
-              <span className="spacer" />
-              {i < v.turnIndex ? (
-                <Check size={16} aria-label="done" />
-              ) : i === v.turnIndex ? (
-                <span className="chip lime">speaking</span>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      </aside>
     </div>
   );
 }
@@ -639,6 +576,17 @@ function ResultCard({
   const r = v.result;
   if (!r) return null;
   const impostorNames = r.impostors.map((i) => nameOf(view, i));
+  if (v.config.spoken)
+    return (
+      <section className="reveal-card card paper" aria-label="Round result">
+        <div className="eyebrow">The footballer was</div>
+        <div className="reveal-name">{r.footballer.name}</div>
+        <div className="reveal-imp">
+          <span className="chip red">Impostor{impostorNames.length > 1 ? 's' : ''}</span>
+          <strong>{impostorNames.join(' & ')}</strong>
+        </div>
+      </section>
+    );
   const verdict =
     r.ejected === null
       ? 'Nobody was ejected — the impostor walks free.'
