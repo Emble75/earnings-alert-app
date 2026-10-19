@@ -78,13 +78,23 @@ export function ImpostorScreen({ ctl }: { ctl: RoomController }) {
         )}
       </header>
 
-      {v.phase === 'reveal' && <RevealPhase ctl={ctl} v={v} act={act} />}
+      {v.phase === 'reveal' &&
+        (v.config.spoken ? (
+          <RoleDeal key={view.you} ctl={ctl} v={v} act={act} />
+        ) : (
+          <RevealPhase ctl={ctl} v={v} act={act} />
+        ))}
       {v.phase === 'clues' && v.config.spoken && <SpokenCluesPhase ctl={ctl} v={v} act={act} />}
       {v.phase === 'clues' && !v.config.spoken && (
         <CluesPhase ctl={ctl} v={v} act={act} isHost={isHost} />
       )}
       {v.phase === 'discussion' && <DiscussionPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
-      {v.phase === 'voting' && <VotingPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
+      {v.phase === 'voting' &&
+        (v.config.spoken ? (
+          <GroupVerdict ctl={ctl} v={v} act={act} />
+        ) : (
+          <VotingPhase ctl={ctl} v={v} act={act} isHost={isHost} />
+        ))}
       {v.phase === 'result' && (
         <>
           <ResultCard ctl={ctl} v={v} />
@@ -153,6 +163,110 @@ function RoleCard({ v }: { v: ImpostorView }) {
         {shown ? <EyeOff aria-hidden size={20} /> : <Eye aria-hidden size={20} />}
         {shown ? 'Hide' : 'Show my role'}
       </Button>
+    </div>
+  );
+}
+
+/** In-person: each player in turn taps their card, reads it, and passes the phone on. No separate screens. */
+function RoleDeal({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
+  const { view } = ctl;
+  const [shown, setShown] = useState(false);
+  const me = nameOf(view, view.you);
+  const impostor = v.you.role === 'impostor';
+  return (
+    <div className="deal">
+      <div className="eyebrow">
+        Card {v.readyIds.length + 1} of {v.participants.length}
+      </div>
+      <button
+        type="button"
+        className={`role-card deal-card ${shown ? (impostor ? 'is-impostor' : 'is-crew') : 'is-hidden'}`}
+        aria-pressed={shown}
+        onClick={() => {
+          cue('tap');
+          setShown((x) => !x);
+        }}
+      >
+        {shown ? (
+          impostor ? (
+            <>
+              <span className="role-big">Impostor</span>
+              {v.you.hint && <span className="hint-line">{v.you.hint}</span>}
+              {v.you.partners.length > 0 && (
+                <span className="hint-line">
+                  With you: {v.you.partners.map((id) => nameOf(view, id)).join(', ')}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="role-label">The footballer is</span>
+              <span className="role-big name">{v.you.footballer}</span>
+            </>
+          )
+        ) : (
+          <>
+            <Avatar id={view.you} name={me} size={64} />
+            <span className="role-big name">{me}</span>
+            <span className="deal-tap">Tap to see your card</span>
+          </>
+        )}
+      </button>
+      <Live>
+        {shown
+          ? impostor
+            ? 'You are the impostor.'
+            : `The footballer is ${v.you.footballer}.`
+          : `${me}, tap to see your card.`}
+      </Live>
+      {shown ? (
+        <Button size="lg" block onClick={() => act(gameAction({ type: 'ready' }))}>
+          <Check aria-hidden /> Got it — pass the phone on
+        </Button>
+      ) : (
+        <p className="field-hint">Make sure only {me} is looking, then tap the card.</p>
+      )}
+    </div>
+  );
+}
+
+/** In-person: the group points at someone; the phone holder taps that name. */
+function GroupVerdict({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
+  const { view } = ctl;
+  const [pick, setPick] = useState<string | null>(null);
+  return (
+    <div className="stack">
+      <p className="lede">
+        Time to decide. Everyone points at who they think the impostor is — then tap the person most
+        of you picked.
+      </p>
+      <div className="vote-grid" role="radiogroup" aria-label="Who did the group pick?">
+        {v.participants.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={pick === id}
+            className={`vote-card ${pick === id ? 'picked' : ''}`}
+            onClick={() => setPick(id)}
+          >
+            <Avatar id={id} name={nameOf(view, id)} size={48} />
+            <span className="vote-name">{nameOf(view, id)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="row wrap">
+        <Button
+          size="lg"
+          disabled={!pick}
+          onClick={() => pick && act(gameAction({ type: 'accuse', target: pick }))}
+        >
+          <Gavel aria-hidden size={20} /> Reveal
+        </Button>
+        <Button variant="ghost" onClick={() => act(gameAction({ type: 'accuse', target: 'skip' }))}>
+          <UserX aria-hidden size={18} /> No clear majority
+        </Button>
+      </div>
     </div>
   );
 }

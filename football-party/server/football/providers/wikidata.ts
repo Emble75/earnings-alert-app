@@ -291,6 +291,7 @@ export function wikidataProvider(opts: WikidataOptions): FootballProvider {
           birthYear,
           position: pos ? (POSITION[pos] ?? null) : null,
           tier: tierFromSitelinks(Object.keys(p.sitelinks ?? {}).length),
+          fame: Object.keys(p.sitelinks ?? {}).length,
           source: 'wikidata',
           providerIds: { wikidata: p.id },
         });

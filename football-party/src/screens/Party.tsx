@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Hand, Loader2, Plus, X } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, X } from 'lucide-react';
 import type { GameId } from '@shared/games/types';
 import { maxImpostors } from '@shared/games/impostor';
 import { gameMeta, gameMetaList } from '@/games/meta';
@@ -273,28 +273,9 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
   );
 }
 
-function reasonFor(view: ReturnType<typeof useLocalRoom>['controller']): string {
-  const g = view?.view.game;
-  if (!g) return 'Your turn.';
-  if (g.id === 'tictactoe') return 'Your move: pick a square and name a footballer.';
-  const phase = (g.view as { phase: string }).phase;
-  return phase === 'reveal'
-    ? 'See your secret role — nobody else peeks.'
-    : phase === 'clues'
-      ? 'Your turn.'
-      : phase === 'voting'
-        ? 'Cast your vote.'
-        : 'Your turn.';
-}
-// Spoken clues are public (said aloud), so only role reveal and voting need a hand-over.
-const PRIVATE_PHASES = new Set(['reveal', 'voting']);
-
 function PartyRun({ setup, onExit }: { setup: LocalSetup; onExit: () => void }) {
   const nav = useNavigate();
   const local = useLocalRoom(setup);
-  const [confirmed, setConfirmed] = useState<string | null>(null);
-  const passing =
-    setup.game === 'impostor' || (setup.game === 'tictactoe' && setup.opponent === 'friend');
 
   if (local.error)
     return (
@@ -326,39 +307,6 @@ function PartyRun({ setup, onExit }: { setup: LocalSetup; onExit: () => void }) 
     );
 
   const ctl = local.controller;
-  const gv = ctl.view.game;
-  const privatePhase =
-    gv?.id === 'tictactoe'
-      ? (gv.view as { phase: string }).phase === 'playing'
-      : gv
-        ? PRIVATE_PHASES.has((gv.view as { phase: string }).phase)
-        : false;
-  const needGate =
-    passing &&
-    privatePhase &&
-    local.actingId !== null &&
-    confirmed !== local.actingId &&
-    ctl.view.status === 'playing';
-
-  if (needGate && local.actingId) {
-    const who = local.names[local.actingId] ?? 'next player';
-    return (
-      <div className="pass-gate" role="dialog" aria-modal aria-label={`Pass the phone to ${who}`}>
-        <Hand size={48} aria-hidden />
-        <div className="eyebrow lime">Pass the phone to</div>
-        <Avatar id={local.actingId} name={who} size={72} />
-        <h1>{who}</h1>
-        <p>{reasonFor(ctl)}</p>
-        <Button size="lg" onClick={() => setConfirmed(local.actingId)}>
-          I’m {who} — show my screen
-        </Button>
-      </div>
-    );
-  }
-  return (
-    <RoomFrame
-      ctl={ctl}
-      local={{ onExit, onRestart: () => (setConfirmed(null), local.restart()) }}
-    />
-  );
+  // No hand-over screens: Tic-Tac-Toe is public, and Impostor deals its secret cards one tap at a time.
+  return <RoomFrame ctl={ctl} local={{ onExit, onRestart: local.restart }} />;
 }

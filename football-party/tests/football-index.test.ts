@@ -162,3 +162,52 @@ describe('impostor pool', () => {
     );
   });
 });
+
+describe('impostor pool is limited to genuinely famous players', () => {
+  it('is ranked by fame, capped per difficulty, and prefers curated famous names', () => {
+    const easy = idx.impostorPool('all', 'easy');
+    expect(easy.length).toBeLessThanOrEqual(100);
+    const fames = easy.map((p) => idx.fameOf(p.id));
+    expect(fames).toEqual([...fames].sort((a, b) => b - a));
+    expect(easy[0]!.name).toBe('Lionel Messi'); // top of the curated list
+    expect(idx.impostorPool('all', 'hard').length).toBeLessThanOrEqual(400);
+  });
+  it('never offers an unknown player, even when the dataset is huge', () => {
+    const base = sampleDataset.players[0]!;
+    const obscure = {
+      ...base,
+      id: 'volodymyr-lyutyi',
+      name: 'Volodymyr Lyutyi',
+      aliases: [],
+      tier: 2 as const,
+      fame: 5,
+    };
+    const many = Array.from({ length: 700 }, (_, i) => ({
+      ...base,
+      id: `filler-${i}`,
+      name: `Filler Star ${i}`,
+      aliases: [],
+      tier: 1 as const,
+      fame: 6 + i,
+    }));
+    const big = new FootballIndex({
+      ...sampleDataset,
+      players: [...sampleDataset.players, obscure, ...many],
+    });
+    for (const d of ['easy', 'medium', 'hard'] as const)
+      expect(big.impostorPool('all', d).some((p) => p.id === 'volodymyr-lyutyi')).toBe(false);
+  });
+  it('ranks search results by fame among equal text matches', () => {
+    const base = sampleDataset.players[0]!;
+    const twin = {
+      ...base,
+      id: 'obscure-twin',
+      name: 'Lionel Messi',
+      aliases: [],
+      tier: 3 as const,
+      fame: 1,
+    };
+    const i2 = new FootballIndex({ ...sampleDataset, players: [twin, ...sampleDataset.players] });
+    expect(i2.searchPlayers('lionel messi')[0]!.id).toBe('lionel-messi');
+  });
+});

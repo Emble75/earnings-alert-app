@@ -71,6 +71,8 @@ export const PlayerSchema = z.object({
   position: PositionGroup.nullable().default(null),
   /** Fame tier for difficulty: 1 = global star, 2 = well known, 3 = for fans. */
   tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
+  /** Finer-grained popularity score (higher = better known); drives Impostor's "top N" pools and search ranking. */
+  fame: z.number().int().min(0).default(0),
   source: z.string(),
   providerIds: z.record(z.string(), z.string()).default({}),
 });

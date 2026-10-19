@@ -260,6 +260,7 @@ export function buildStatsBombDataset(inputs: SbInput[], generatedAt: string): D
       // Fame proxy (this data has no popularity signal): appearances, with international tournaments
       // weighted heavily because club coverage is skewed toward a few teams (e.g. Barcelona).
       tier: fameScore(r) >= 80 ? 1 : fameScore(r) >= 30 ? 2 : 3,
+      fame: fameScore(r),
       source: 'statsbomb',
       providerIds: { statsbomb: id.slice(4) },
     };

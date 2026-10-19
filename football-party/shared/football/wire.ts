@@ -18,8 +18,8 @@ export interface CompactDataset {
   >[];
   /** [teamId, competitionId, fromSeason, toSeason|null, confirmed(1)|unknown(0)] */
   memberships: [string, string, number, number | null, 0 | 1][];
-  /** [id, name, birthYear|null, position|null, tier, aliases] */
-  players: [string, string, number | null, string | null, number, string[]][];
+  /** [id, name, birthYear|null, position|null, tier, aliases, fame] */
+  players: [string, string, number | null, string | null, number, string[], number][];
   /** [playerId, teamId, fromSeason|null, toSeason|null, precision(0 season|1 year|2 unknown), confirmed(1)|unknown(0)] */
   affiliations: [string, string, number | null, number | null, 0 | 1 | 2, 0 | 1][];
 }
@@ -52,7 +52,15 @@ export function compactDataset(d: Dataset): CompactDataset {
       m.toSeason,
       m.status === 'confirmed' ? 1 : 0,
     ]),
-    players: d.players.map((p) => [p.id, p.name, p.birthYear, p.position, p.tier, p.aliases]),
+    players: d.players.map((p) => [
+      p.id,
+      p.name,
+      p.birthYear,
+      p.position,
+      p.tier,
+      p.aliases,
+      p.fame,
+    ]),
     affiliations: d.affiliations.map((a) => [
       a.playerId,
       a.teamId,
@@ -79,13 +87,14 @@ export function expandDataset(c: CompactDataset): Dataset {
       status: ok ? 'confirmed' : 'unknown',
       source: src,
     })),
-    players: c.players.map(([id, name, birthYear, position, tier, aliases]) => ({
+    players: c.players.map(([id, name, birthYear, position, tier, aliases, fame]) => ({
       id,
       name,
       birthYear,
       position: position as Dataset['players'][number]['position'],
       tier: tier as 1 | 2 | 3,
       aliases,
+      fame: fame ?? 0,
       source: src,
       providerIds: {},
     })),

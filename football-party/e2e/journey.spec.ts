@@ -238,15 +238,14 @@ test('one-phone party: play a move against the computer', async ({ browser }, in
   await page.context().close();
 });
 
-test('one-phone party: three friends pass the phone in Tic-Tac-Toe (teams alternate)', async ({
+test('one-phone party: three friends share the phone in Tic-Tac-Toe (teams alternate, no hand-over screens)', async ({
   browser,
 }, info) => {
   const page = await newPlayer(browser, info.project.use);
   await page.goto('/party/tictactoe');
   await expect(page.getByText(/X\s*Player 1, Player 3/)).toBeVisible(); // team preview
   await page.getByRole('button', { name: /kick off/i }).click();
-  await expect(page.getByRole('dialog', { name: /pass the phone to player 1/i })).toBeVisible();
-  await page.getByRole('button', { name: /i’m player 1/i }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0); // nothing secret, so nothing to hide
   await expect(page.getByRole('grid')).toBeVisible();
   const [r, c] = (await page.getByRole('gridcell').first().getAttribute('aria-label'))!
     .split(': ')[0]!
@@ -255,52 +254,48 @@ test('one-phone party: three friends pass the phone in Tic-Tac-Toe (teams altern
   await page.getByRole('gridcell').first().click();
   await page.getByRole('combobox', { name: /search footballers/i }).fill(name);
   await page.getByRole('option', { name }).click();
-  // the board is hidden behind a hand-over screen for the next player (O side starts with Player 2)
-  await expect(page.getByRole('dialog', { name: /pass the phone to player 2/i })).toBeVisible();
-  await expect(page.getByRole('grid')).toHaveCount(0);
-  await page.getByRole('button', { name: /i’m player 2/i }).click();
+  // straight on to the next team's turn (Player 2), same screen
   await expect(page.getByRole('gridcell').first()).toHaveAttribute('aria-label', new RegExp(name));
+  await expect(page.getByText('Pick a square')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.context().close();
 });
 
-test('one-phone party: Impostor is spoken (no typing) and keeps secrets between hand-overs', async ({
+test('one-phone party: Impostor deals cards one tap at a time, clues are spoken, the group decides', async ({
   browser,
 }, info) => {
   const page = await newPlayer(browser, info.project.use);
   await page.goto('/party/impostor');
-  await page.getByRole('radio', { name: 'Off — take your time' }).click(); // untimed
+  await page.getByRole('radio', { name: 'Off — take your time' }).click();
   await page.getByRole('button', { name: /kick off/i }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0); // no hand-over screens at all
   let secret = '';
   const seen: string[] = [];
   for (let i = 1; i <= 3; i++) {
+    // face-down card shows only the player's name; nothing of the previous secret is in the page
     await expect(
-      page.getByRole('dialog', { name: new RegExp(`pass the phone to player ${i}`, 'i') }),
+      page.getByRole('button', { name: new RegExp(`player ${i}.*tap to see`, 'i') }),
     ).toBeVisible();
-    if (secret) expect(await page.content()).not.toContain(secret); // previous secret is gone from the DOM
-    await page.getByRole('button', { name: new RegExp(`i’m player ${i}`, 'i') }).click();
-    await page.getByRole('button', { name: /show my role/i }).click();
-    const imp = (await page.locator('.role-card.is-impostor').count()) > 0;
+    if (secret) expect(await page.content()).not.toContain(secret);
+    await page.getByRole('button', { name: new RegExp(`player ${i}.*tap to see`, 'i') }).click();
+    const imp = (await page.locator('.deal-card.is-impostor').count()) > 0;
     seen.push(imp ? 'impostor' : 'crew');
-    if (!imp) secret = (await page.locator('.role-big.name').innerText()).trim();
-    await page.getByRole('button', { name: /got it/i }).click();
+    if (!imp) secret = (await page.locator('.deal-card .role-big.name').innerText()).trim();
+    await page.getByRole('button', { name: /got it — pass the phone on/i }).click();
   }
   expect(seen.filter((x) => x === 'impostor')).toHaveLength(1);
-  // Clues are said out loud: no hand-over, no text box, just "next speaker".
+  // Clues are said out loud: no text box, just "next speaker".
   await expect(page.getByText(/give your clue/i).first()).toBeVisible();
   await expect(page.getByRole('textbox')).toHaveCount(0);
   await expect(page.getByText(secret)).toHaveCount(0);
   for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /done — /i }).click();
   await expect(page.getByRole('heading', { name: /half-time/i })).toBeVisible();
   await page.getByRole('button', { name: /skip to voting/i }).click();
-  // Each player votes privately after a hand-over.
-  for (let i = 1; i <= 3; i++) {
-    await expect(
-      page.getByRole('dialog', { name: new RegExp(`pass the phone to player ${i}`, 'i') }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: new RegExp(`i’m player ${i}`, 'i') }).click();
-    await page.getByRole('radio').first().click();
-  }
+  // The group points; one tap on the phone gives the verdict.
+  await page.getByRole('radio', { name: /player 1/i }).click();
+  await page.getByRole('button', { name: /^reveal$/i }).click();
   await expect(page.getByText('The footballer was')).toBeVisible();
+  await expect(page.getByText(secret).first()).toBeVisible();
   await page.context().close();
 });
 

@@ -67,14 +67,14 @@ function ImpostorConfigPanel({
         </div>
         <div className="span-2">
           <Segmented
-            label="Difficulty (how famous)"
+            label="Footballers: only the most famous…"
             value={config.difficulty}
             disabled={disabled}
             onChange={(v) => onChange({ difficulty: v })}
             options={[
-              { value: 'easy', label: 'Superstars' },
-              { value: 'medium', label: 'Well known' },
-              { value: 'hard', label: 'Deep cuts' },
+              { value: 'easy', label: 'Top 100' },
+              { value: 'medium', label: 'Top 250' },
+              { value: 'hard', label: 'Top 400' },
             ]}
           />
         </div>

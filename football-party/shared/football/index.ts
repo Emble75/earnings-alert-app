@@ -1,6 +1,7 @@
 import { shuffle, type Rng } from '../util/rng';
 import { normalizeText } from './normalize';
 import { isProminentClub } from './prominence';
+import { famousRank } from './famous';
 import type {
   Affiliation,
   Competition,
@@ -41,6 +42,8 @@ export const IMPOSTOR_CATEGORY_LABELS: Record<ImpostorCategory, string> = {
   current: 'Still active in our data',
 };
 
+const IMPOSTOR_TOP_ALL: Record<Difficulty, number> = { easy: 100, medium: 250, hard: 400 };
+const IMPOSTOR_TOP_CATEGORY: Record<Difficulty, number> = { easy: 40, medium: 100, hard: 200 };
 const MAX_TIER: Record<Difficulty, 1 | 2 | 3> = { easy: 1, medium: 2, hard: 3 };
 
 interface SearchEntry {
@@ -72,6 +75,10 @@ export class FootballIndex {
   private teamsByLeague = new Map<string, Set<string>>();
   private search: SearchEntry[] = [];
   private criterionCache = new Map<string, Set<string>>();
+  private effectiveFame = new Map<string, number>();
+  fameOf(id: string) {
+    return this.effectiveFame.get(id) ?? 0;
+  }
 
   constructor(readonly dataset: Dataset) {
     this.meta = dataset.meta;
@@ -103,6 +110,26 @@ export class FootballIndex {
         names: names.map((full) => ({ full, tokens: full.split(' ') })),
       });
     }
+    this.applyFamousBoost();
+  }
+
+  /**
+   * Curated famous names outrank everything else (score 100000 - rank), but only for the best-known
+   * bearer of a name, so an unknown namesake never inherits a star's fame.
+   */
+  private applyFamousBoost() {
+    const best = new Map<number, FootballPlayer>();
+    for (const p of this.players.values()) {
+      const ranks = [p.name, ...p.aliases]
+        .map(famousRank)
+        .filter((r): r is number => r !== undefined);
+      if (!ranks.length) continue;
+      const r = Math.min(...ranks);
+      const cur = best.get(r);
+      if (!cur || p.fame > cur.fame) best.set(r, p);
+    }
+    for (const p of this.players.values()) this.effectiveFame.set(p.id, p.fame);
+    for (const [rank, p] of best) this.effectiveFame.set(p.id, 100000 - rank);
   }
 
   get counts() {
@@ -160,10 +187,14 @@ export class FootballIndex {
         else if (name.includes(q)) s = 40;
         if (s > best) best = s;
       }
-      if (best > 0) scored.push({ entry, score: best - entry.player.tier });
+      if (best > 0) scored.push({ entry, score: best });
     }
+    // Best text match first; among equals the better-known player (so "young" finds Ashley before obscure namesakes).
     scored.sort(
-      (a, b) => b.score - a.score || a.entry.player.name.localeCompare(b.entry.player.name),
+      (a, b) =>
+        b.score - a.score ||
+        this.fameOf(b.entry.player.id) - this.fameOf(a.entry.player.id) ||
+        a.entry.player.name.localeCompare(b.entry.player.name),
     );
     return scored.slice(0, limit).map((s) => this.card(s.entry.player.id)!);
   }
@@ -384,11 +415,16 @@ export class FootballIndex {
     return comp ? this.criterionFor('league', comp.id) : null;
   }
 
+  /**
+   * Footballers an Impostor round may draw from: only genuinely well-known ones. Candidates are
+   * ranked by fame and cut to the top N (everything: 100 / 250 / 400 by difficulty; within a league
+   * or other category: 40 / 100 / 200), so obscure players can never appear.
+   */
   impostorPool(category: ImpostorCategory, difficulty: Difficulty): FootballPlayer[] {
     const maxTier = MAX_TIER[difficulty];
     const leagueCrit = this.leagueForCategory(category);
     const leagueSet = leagueCrit ? this.playersFor(leagueCrit) : null;
-    return this.allPlayers().filter((p) => {
+    const candidates = this.allPlayers().filter((p) => {
       if (p.tier > maxTier || !p.position) return false;
       if (leagueSet) return leagueSet.has(p.id);
       if (category === 'legends') return p.birthYear !== null && p.birthYear <= 1980;
@@ -398,5 +434,10 @@ export class FootballIndex {
         );
       return true;
     });
+    const top =
+      category === 'all' ? IMPOSTOR_TOP_ALL[difficulty] : IMPOSTOR_TOP_CATEGORY[difficulty];
+    return candidates
+      .sort((a, b) => this.fameOf(b.id) - this.fameOf(a.id) || a.name.localeCompare(b.name))
+      .slice(0, top);
   }
 }

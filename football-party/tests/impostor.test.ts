@@ -330,3 +330,71 @@ describe('impostor with spoken clues (in-person play)', () => {
     expect(state(room).clues).toEqual([]);
   });
 });
+
+describe('impostor group verdict (in-person)', () => {
+  const inPerson = () =>
+    startedRoom(['ana', 'ben', 'cy', 'dee'], {
+      spoken: true,
+      timers: false,
+      clueRounds: 1,
+      rounds: 1,
+    });
+  const toVerdict = (room: Room, env: ReturnType<typeof makeEnv>) => {
+    toClues(room, env);
+    for (let i = 0; i < 4; i++) applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env); // discussion → verdict
+    expect(state(room).phase).toBe('voting');
+    expect(state(room).deadline).toBeNull();
+  };
+
+  it('scores the group pick: correct accusation → crew +3, impostor 0', () => {
+    const { room, env } = inPerson();
+    toVerdict(room, env);
+    const impostor = state(room).secret.impostors[0]!;
+    applyCommand(room, 'ana', cmd.act({ type: 'accuse', target: impostor }), env);
+    const res = state(room).result!;
+    expect(state(room).phase).toBe('result');
+    expect(res.ejected).toBe(impostor);
+    expect(res.crewWon).toBe(true);
+    for (const p of room.players) expect(res.deltas[p.id] ?? 0).toBe(p.id === impostor ? 0 : 3);
+    expect(state(room).deadline).toBeNull(); // in person: waits for the group
+  });
+
+  it('wrong accusation lets the impostor win; "no majority" ejects nobody', () => {
+    const a = inPerson();
+    toVerdict(a.room, a.env);
+    const imp = state(a.room).secret.impostors[0]!;
+    const innocent = a.room.players.map((p) => p.id).find((id) => id !== imp)!;
+    applyCommand(a.room, 'ana', cmd.act({ type: 'accuse', target: innocent }), a.env);
+    expect(state(a.room).result!.crewWon).toBe(false);
+    expect(state(a.room).result!.deltas[imp]).toBeGreaterThanOrEqual(3);
+
+    const b = inPerson();
+    toVerdict(b.room, b.env);
+    applyCommand(b.room, 'ana', cmd.act({ type: 'accuse', target: 'skip' }), b.env);
+    expect(state(b.room).result!.ejected).toBeNull();
+  });
+
+  it('rejects accusations outside in-person voting, from non-hosts, and for unknown players', () => {
+    const online = startedRoom(['ana', 'ben', 'cy']);
+    toClues(online.room, online.env);
+    expect(() =>
+      applyCommand(online.room, 'ana', cmd.act({ type: 'accuse', target: 'ben' }), online.env),
+    ).toThrowError(/no group verdict/i);
+    const { room, env } = inPerson();
+    toVerdict(room, env);
+    expect(() =>
+      applyCommand(room, 'ben', cmd.act({ type: 'accuse', target: 'cy' }), env),
+    ).toThrowError(/host/);
+    expect(() =>
+      applyCommand(room, 'ana', cmd.act({ type: 'accuse', target: 'ghost' }), env),
+    ).toThrow(GameError);
+  });
+
+  it('waits for every card to be seen: no auto-start of the round', () => {
+    const { room, env } = inPerson();
+    expect(state(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000);
+    expect(state(room).phase).toBe('reveal');
+  });
+});

@@ -303,6 +303,7 @@ export function buildSampleDataset(generatedAt = '2025-01-01T00:00:00.000Z'): Da
         birthYear: Number(born),
         position: pos,
         tier: Number(tier) as 1 | 2 | 3,
+        fame: Number(tier) === 1 ? 100 : Number(tier) === 2 ? 50 : 10,
         source: SOURCE,
         providerIds: {},
       };

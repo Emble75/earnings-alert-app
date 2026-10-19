@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeText } from '../../../shared/football/normalize';
+import { isProminentClub } from '../../../shared/football/prominence';
 import {
   DatasetSchema,
   type Affiliation,
@@ -440,6 +441,11 @@ export function buildOpenDataset(input: OpenDataInput, generatedAt: string): Dat
           : p.maxFee >= 8 || p.wcTournaments >= 1 || p.events.size >= 12
             ? 2
             : 3;
+      const prominentClubs = new Set(
+        [...p.events.values()].map((e) => e.club).filter(isProminentClub),
+      ).size;
+      // Popularity: biggest transfer fee (EUR m), World Cup appearances and spells at famous clubs.
+      const fame = Math.round(p.maxFee * 1.5 + 30 * p.wcTournaments + 6 * prominentClubs);
       players.push({
         id,
         name: p.name.slice(0, 80),
@@ -447,6 +453,7 @@ export function buildOpenDataset(input: OpenDataInput, generatedAt: string): Dat
         birthYear: birth,
         position: pos,
         tier,
+        fame,
         source: 'opendata',
         providerIds: {},
       });
@@ -549,6 +556,7 @@ export function buildOpenDataset(input: OpenDataInput, generatedAt: string): Dat
       birthYear: a.birth,
       position: a.pos,
       tier: a.tournaments.size >= 3 ? 1 : 2,
+      fame: 40 * a.tournaments.size,
       source: 'opendata',
       providerIds: {},
     });

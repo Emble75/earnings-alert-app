@@ -1640,3 +1640,33 @@ select.input {
 .speak-order li.done {
   opacity: 0.55;
 }
+
+/* One-phone card dealing */
+.deal {
+  display: grid;
+  gap: var(--s-4);
+  max-width: 34rem;
+  margin-inline: auto;
+}
+.deal-card {
+  width: 100%;
+  min-height: 21rem;
+  display: grid;
+  gap: var(--s-3);
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+  cursor: pointer;
+  border-style: dashed;
+}
+.deal-card.is-crew,
+.deal-card.is-impostor {
+  border-style: solid;
+}
+.deal-tap {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
