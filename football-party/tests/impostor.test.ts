@@ -238,3 +238,95 @@ describe('football impostor', () => {
     expect(state(room).turnIndex).toBe(1);
   });
 });
+
+describe('impostor with timers switched off', () => {
+  it('has no deadlines, never auto-advances, and the host can skip stuck turns / close the vote', () => {
+    const { room, env } = startedRoom(['ana', 'ben', 'cy'], {
+      timers: false,
+      clueRounds: 1,
+      rounds: 1,
+    });
+    expect(state(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000); // ten minutes pass: nothing may change
+    expect(state(room).phase).toBe('reveal');
+    toClues(room, env);
+    expect(state(room).phase).toBe('clues');
+    expect(state(room).deadline).toBeNull();
+    advanceMany(room, env, 300_000, 5000);
+    expect(state(room).turnIndex).toBe(0);
+    // host skips the first (absent) player's clue; the others answer
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    expect(state(room).clues).toEqual([expect.objectContaining({ text: null })]);
+    playClues(room, env);
+    expect(state(room).phase).toBe('discussion');
+    advanceMany(room, env, 600_000, 5000);
+    expect(state(room).phase).toBe('discussion'); // waits for the host
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    expect(state(room).phase).toBe('voting');
+    expect(state(room).deadline).toBeNull();
+    act(room, 'ana', { type: 'vote', target: 'ben' }, env);
+    advanceMany(room, env, 600_000, 5000);
+    expect(state(room).phase).toBe('voting'); // not everyone has voted, nothing forces it
+    expect(() => applyCommand(room, 'ben', cmd.act({ type: 'advance' }), env)).toThrowError(/host/);
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env); // host closes the vote
+    expect(state(room).phase).toBe('result');
+    expect(state(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000);
+    expect(state(room).phase).toBe('result'); // waits for the host
+    applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    expect(state(room).phase).toBe('final');
+  });
+
+  it('still skips a disconnected player quickly, and not once they are back', () => {
+    const { room, env } = startedRoom(['ana', 'ben', 'cy'], { timers: false, clueRounds: 1 });
+    toClues(room, env);
+    const gone = state(room).turnOrder[0]!;
+    const p = room.players.find((x) => x.id === gone)!;
+    p.connected = false;
+    advanceTime(room, env, 0);
+    expect(state(room).deadline).not.toBeNull();
+    p.connected = true; // comes back in time
+    advanceTime(room, env, 1000);
+    expect(state(room).deadline).toBeNull();
+    expect(state(room).turnIndex).toBe(0);
+    p.connected = false;
+    advanceTime(room, env, 0);
+    advanceMany(room, env, 4000, 500);
+    expect(state(room).turnIndex).toBe(1);
+  });
+});
+
+describe('impostor with spoken clues (in-person play)', () => {
+  it('rejects typed clues and advances speakers via the host; no clue text is stored', () => {
+    const { room, env } = startedRoom(['ana', 'ben', 'cy'], {
+      spoken: true,
+      clueRounds: 1,
+      rounds: 1,
+    });
+    toClues(room, env);
+    const first = state(room).turnOrder[0]!;
+    expect(() => act(room, first, { type: 'clue', text: 'left foot' }, env)).toThrowError(
+      /out loud/,
+    );
+    const view = buildRoomView(room, 'ana', env).game!.view as {
+      turnOrder: string[];
+      turnIndex: number;
+    };
+    expect(view.turnOrder).toHaveLength(3);
+    for (let i = 0; i < 3; i++) applyCommand(room, 'ana', cmd.act({ type: 'advance' }), env);
+    expect(state(room).phase).toBe('discussion');
+    expect(state(room).clues).toEqual([]);
+  });
+
+  it('still times a speaker out when timers are on, without recording a "ran out of time" clue', () => {
+    const { room, env } = startedRoom(['ana', 'ben', 'cy'], {
+      spoken: true,
+      clueRounds: 1,
+      clueSeconds: 10,
+    });
+    toClues(room, env);
+    advanceMany(room, env, 10_500, 500);
+    expect(state(room).turnIndex).toBe(1);
+    expect(state(room).clues).toEqual([]);
+  });
+});

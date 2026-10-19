@@ -10,6 +10,10 @@ const CATEGORY_KEYS = Object.keys(IMPOSTOR_CATEGORY_LABELS) as [
 ];
 
 export const ImpostorConfigSchema = z.object({
+  /** Master switch: false = no phase timers at all (phases end when everyone is done or the host skips). */
+  timers: z.boolean().default(true),
+  /** In-person play: clues are said aloud, so the app only tracks whose turn it is (no typing). */
+  spoken: z.boolean().default(false),
   impostors: z.number().int().min(1).max(3).default(1),
   rounds: z.number().int().min(1).max(8).default(3),
   clueRounds: z.number().int().min(1).max(3).default(2),
@@ -84,6 +88,9 @@ export interface ImpostorView {
   deadline: number | null;
   participants: string[];
   turnPlayerId: string | null;
+  /** Speaking order of the current clue lap and the position within it (not secret). */
+  turnOrder: string[];
+  turnIndex: number;
   clues: Clue[];
   you: {
     role: 'crew' | 'impostor' | null;
@@ -101,6 +108,10 @@ export interface ImpostorView {
   abortedReason: string | null;
   config: ImpostorConfig;
 }
+
+/** Deadline `seconds` from now, or null when timers are switched off. */
+const dl = (cfg: { timers: boolean }, ctx: { now: number }, seconds: number) =>
+  cfg.timers ? ctx.now + seconds * 1000 : null;
 
 const REVEAL_SECONDS = 25;
 const RESULT_SECONDS = 40;
@@ -171,7 +182,7 @@ function startRound(
     config,
     round: (prev?.round ?? 0) + 1,
     phase: 'reveal',
-    deadline: ctx.now + REVEAL_SECONDS * 1000,
+    deadline: dl(config, ctx, REVEAL_SECONDS),
     participants,
     secret: {
       footballerId: f.id,
@@ -202,23 +213,23 @@ function beginClues(s: ImpostorState, ctx: GameContext): ImpostorState {
     clueRound: 1,
     turnOrder: order,
     turnIndex: 0,
-    deadline: ctx.now + s.config.clueSeconds * 1000,
+    deadline: dl(s.config, ctx, s.config.clueSeconds),
   };
 }
 
 function advanceTurn(s: ImpostorState, ctx: GameContext): ImpostorState {
   const next = s.turnIndex + 1;
   if (next < s.turnOrder.length)
-    return { ...s, turnIndex: next, deadline: ctx.now + s.config.clueSeconds * 1000 };
+    return { ...s, turnIndex: next, deadline: dl(s.config, ctx, s.config.clueSeconds) };
   if (s.clueRound < s.config.clueRounds)
     return {
       ...s,
       clueRound: s.clueRound + 1,
       turnOrder: shuffle(s.participants, ctx.rng),
       turnIndex: 0,
-      deadline: ctx.now + s.config.clueSeconds * 1000,
+      deadline: dl(s.config, ctx, s.config.clueSeconds),
     };
-  return { ...s, phase: 'discussion', deadline: ctx.now + s.config.discussionSeconds * 1000 };
+  return { ...s, phase: 'discussion', deadline: dl(s.config, ctx, s.config.discussionSeconds) };
 }
 
 function computeResult(s: ImpostorState, ctx: GameContext): ImpostorState {
@@ -255,7 +266,7 @@ function computeResult(s: ImpostorState, ctx: GameContext): ImpostorState {
   return {
     ...s,
     phase: 'result',
-    deadline: ctx.now + RESULT_SECONDS * 1000,
+    deadline: dl(s.config, ctx, RESULT_SECONDS),
     scores,
     result: {
       footballer: { id: s.secret.footballerId, name: s.secret.name },
@@ -294,8 +305,10 @@ function settle(s: ImpostorState, ctx: GameContext): ImpostorState {
     if (cur.phase === 'clues') {
       const turnPlayer = cur.turnOrder[cur.turnIndex]!;
       const gone = !online.includes(turnPlayer);
-      if (gone && cur.deadline !== null && cur.deadline > ctx.now + DISCONNECT_SKIP_MS) {
+      if (gone && (cur.deadline === null || cur.deadline > ctx.now + DISCONNECT_SKIP_MS)) {
         cur = { ...cur, deadline: ctx.now + DISCONNECT_SKIP_MS };
+      } else if (!gone && !cur.config.timers && cur.deadline !== null) {
+        cur = { ...cur, deadline: null }; // came back before being skipped; with timers off the only deadline is the disconnect grace
       }
     }
     if (
@@ -311,14 +324,16 @@ function settle(s: ImpostorState, ctx: GameContext): ImpostorState {
       else if (cur.phase === 'clues') {
         const turnPlayer = cur.turnOrder[cur.turnIndex]!;
         cur = advanceTurn(
-          {
-            ...cur,
-            clues: [...cur.clues, { round: cur.clueRound, playerId: turnPlayer, text: null }],
-          },
+          cur.config.spoken
+            ? cur
+            : {
+                ...cur,
+                clues: [...cur.clues, { round: cur.clueRound, playerId: turnPlayer, text: null }],
+              },
           ctx,
         );
       } else if (cur.phase === 'discussion')
-        cur = { ...cur, phase: 'voting', deadline: ctx.now + cur.config.voteSeconds * 1000 };
+        cur = { ...cur, phase: 'voting', deadline: dl(cur.config, ctx, cur.config.voteSeconds) };
       else if (cur.phase === 'voting') cur = computeResult(cur, ctx);
       else if (cur.phase === 'result') cur = nextRound(cur, ctx);
       else break;
@@ -363,6 +378,8 @@ export const impostorGame: GameModule<ImpostorConfig, ImpostorState, ImpostorAct
         }
         case 'clue': {
           if (s.phase !== 'clues') throw new GameError('wrong-phase', 'Not the clue phase.');
+          if (s.config.spoken)
+            throw new GameError('spoken-clues', 'Clues are said out loud in this game.');
           if (s.turnOrder[s.turnIndex] !== actorId)
             throw new GameError('not-your-turn', 'Wait for your turn.');
           const text = sanitizeClue(action.text);
@@ -393,10 +410,17 @@ export const impostorGame: GameModule<ImpostorConfig, ImpostorState, ImpostorAct
           // Host-only: enforced by the room engine through `hostOnly`.
           if (s.phase === 'discussion') {
             s.phase = 'voting';
-            s.deadline = ctx.now + s.config.voteSeconds * 1000;
+            s.deadline = dl(s.config, ctx, s.config.voteSeconds);
           } else if (s.phase === 'result') return settle(nextRound(s, ctx), ctx);
           else if (s.phase === 'reveal') return settle(beginClues(s, ctx), ctx);
-          else throw new GameError('wrong-phase', 'Nothing to skip right now.');
+          else if (s.phase === 'voting')
+            return settle(computeResult(s, ctx), ctx); // host closes the vote
+          else if (s.phase === 'clues') {
+            // Spoken play: "next speaker". Typed play: the host skips an absent/stuck player's clue.
+            if (!s.config.spoken)
+              s.clues.push({ round: s.clueRound, playerId: s.turnOrder[s.turnIndex]!, text: null });
+            return settle(advanceTurn(s, ctx), ctx);
+          } else throw new GameError('wrong-phase', 'Nothing to skip right now.');
           return settle(s, ctx);
         }
       }
@@ -425,6 +449,8 @@ export const impostorGame: GameModule<ImpostorConfig, ImpostorState, ImpostorAct
         deadline: s.deadline,
         participants: s.participants,
         turnPlayerId: s.phase === 'clues' ? (s.turnOrder[s.turnIndex] ?? null) : null,
+        turnOrder: s.phase === 'clues' ? s.turnOrder : [],
+        turnIndex: s.turnIndex,
         clues: s.clues,
         you: {
           role: !isParticipant ? null : isImpostor ? 'impostor' : 'crew',

@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { DoorOpen, Plus, Smartphone, WifiOff } from 'lucide-react';
+import { ArrowRight, DoorOpen, Hand, Plus, Wifi, WifiOff } from 'lucide-react';
 import { normalizeRoomCode } from '@shared/room/code';
-import { gameMetaList } from '@/games/meta';
 import { ApiError, api } from '@/lib/api';
 import { nickname } from '@/lib/storage';
-import { Button, Field, LinkButton, PitchLines } from '@/ui/kit';
+import { Link } from 'react-router-dom';
+import { Button, Field, PitchLines } from '@/ui/kit';
 import { Page } from './Shell';
 
 export function Play() {
@@ -76,9 +76,31 @@ export function Play() {
   return (
     <Page>
       <div className="play-head">
-        <div className="eyebrow lime">Multiplayer</div>
+        <div className="eyebrow lime">Choose how you play</div>
         <h1>Get the squad in</h1>
       </div>
+
+      <Link
+        to="/party"
+        className="party-hero"
+        aria-label="One phone party mode: pass the phone around"
+      >
+        <PitchLines variant="circle" />
+        <Hand size={40} aria-hidden />
+        <div>
+          <div className="eyebrow">No setup needed</div>
+          <h2>One phone, whole squad</h2>
+          <p>Someone starts it, everyone takes turns. Secrets stay hidden between hand-overs.</p>
+        </div>
+        <ArrowRight aria-hidden size={28} className="party-go" />
+      </Link>
+
+      <div className="mode-divider">
+        <span>
+          <Wifi size={14} aria-hidden /> Or play online: everyone on their own phone
+        </span>
+      </div>
+
       <div className="play-grid">
         <form
           className="card paper play-card"
@@ -87,8 +109,8 @@ export function Play() {
           aria-labelledby="create-h"
         >
           <PitchLines variant="circle" />
-          <div className="eyebrow">Host</div>
-          <h2 id="create-h">Create a room</h2>
+          <div className="eyebrow">01 · Host</div>
+          <h2 id="create-h">Create an online room</h2>
           <Field
             label="Your nickname"
             error={nameErr}
@@ -112,7 +134,7 @@ export function Play() {
         </form>
 
         <form className="card play-card join" onSubmit={join} noValidate aria-labelledby="join-h">
-          <div className="eyebrow">Player</div>
+          <div className="eyebrow">02 · Player</div>
           <h2 id="join-h">Join with a code</h2>
           <Field label="Room code" error={codeErr}>
             {(p) => (
@@ -155,33 +177,6 @@ export function Play() {
           <WifiOff aria-hidden size={18} /> {netErr}
         </p>
       )}
-
-      <section className="practice" aria-labelledby="practice-h">
-        <div className="section-head">
-          <div className="eyebrow">No friends online? No signal?</div>
-          <h2 id="practice-h">Practice on this device</h2>
-          <p>
-            Runs entirely in your browser with the built-in sample data — pass-and-play or against
-            the computer. <strong>This is local practice, not cross-device multiplayer.</strong>
-          </p>
-        </div>
-        <div className="practice-grid">
-          {gameMetaList.map((g) => (
-            <div key={g.id} className="card practice-card">
-              <g.icon size={28} aria-hidden />
-              <h3>{g.title}</h3>
-              <p>
-                {g.id === 'impostor'
-                  ? 'Pass-and-play with 3–8 people sharing one phone.'
-                  : 'Face the computer or a friend on the same device.'}
-              </p>
-              <LinkButton to={`/practice/${g.id}`} variant="secondary" size="sm">
-                <Smartphone aria-hidden size={18} /> Practice offline
-              </LinkButton>
-            </div>
-          ))}
-        </div>
-      </section>
     </Page>
   );
 }

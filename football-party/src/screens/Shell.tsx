@@ -75,6 +75,7 @@ export function Header({ children }: { children?: ReactNode }) {
         </Link>
         <nav className="nav" aria-label="Main">
           <NavLink to="/play">Play</NavLink>
+          <NavLink to="/party">One phone</NavLink>
           <NavLink to="/rules">Rules</NavLink>
           <NavLink to="/data">Data</NavLink>
         </nav>

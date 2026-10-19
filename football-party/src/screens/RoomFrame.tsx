@@ -82,7 +82,7 @@ export function RoomFrame({
     <>
       <Header>
         {local ? (
-          <span className="chip yellow">Offline practice</span>
+          <span className="chip yellow">One phone</span>
         ) : (
           <>
             <button
@@ -106,7 +106,7 @@ export function RoomFrame({
         <span className="chip hide-sm">
           <Users size={12} aria-hidden /> {view.players.length}
         </span>
-        <IconButton label={local ? 'Exit practice' : 'Leave room'} onClick={() => setLeaving(true)}>
+        <IconButton label={local ? 'End game' : 'Leave room'} onClick={() => setLeaving(true)}>
           <LogOut size={20} aria-hidden />
         </IconButton>
       </Header>
@@ -122,8 +122,8 @@ export function RoomFrame({
         {local && (
           <p className="banner" style={{ marginBottom: 'var(--s-4)' }}>
             <span>
-              <strong>Local practice.</strong> Runs on this device with sample data — not online
-              multiplayer.
+              <strong>One phone, in person.</strong> Not online multiplayer ·{' '}
+              {view.data.kind === 'sample' ? 'built-in sample data' : view.data.label}
             </span>
           </p>
         )}
@@ -134,7 +134,7 @@ export function RoomFrame({
       <Sheet
         open={leaving}
         onClose={() => setLeaving(false)}
-        title={local ? 'Exit practice?' : 'Leave this room?'}
+        title={local ? 'End this game?' : 'Leave this room?'}
       >
         <p style={{ color: 'var(--chalk-dim)', marginBottom: 'var(--s-5)' }}>
           {local
@@ -145,7 +145,7 @@ export function RoomFrame({
         </p>
         <div className="row wrap">
           <Button variant="danger" onClick={leave}>
-            {local ? 'Exit' : 'Leave room'}
+            {local ? 'End game' : 'Leave room'}
           </Button>
           <Button variant="secondary" onClick={() => setLeaving(false)}>
             Stay

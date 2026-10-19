@@ -120,6 +120,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     };
   });
 
+  // Lets the one-phone party mode run the same engine in the browser on the same (real) data.
+  app.get('/api/dataset', { preHandler: limit('lookup') }, async (_req, reply) => {
+    return reply
+      .header('Content-Type', 'application/json')
+      .header('Content-Encoding', 'gzip')
+      .header('Cache-Control', 'public, max-age=300')
+      .send(football.datasetGzip());
+  });
+
   app.get('/api/players/search', { preHandler: limit('search') }, async (req, reply) => {
     const q = z
       .object({ q: z.string().max(60), limit: z.coerce.number().int().min(1).max(12).default(8) })

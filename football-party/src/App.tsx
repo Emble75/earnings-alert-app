@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Link, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '@/ui/ErrorBoundary';
 import { ToastProvider } from '@/ui/kit';
 import { Landing } from '@/screens/Landing';
@@ -9,7 +9,11 @@ import { CenterMessage, Page } from '@/screens/Shell';
 
 // Rare screens are split out so first load stays small.
 const RoomPage = lazy(() => import('@/screens/RoomPage').then((m) => ({ default: m.RoomPage })));
-const Practice = lazy(() => import('@/screens/Practice').then((m) => ({ default: m.Practice })));
+const Party = lazy(() => import('@/screens/Party').then((m) => ({ default: m.Party })));
+function LegacyPractice() {
+  const { game } = useParams();
+  return <Navigate to={`/party/${game ?? ''}`} replace />;
+}
 const Admin = lazy(() => import('@/screens/Admin').then((m) => ({ default: m.Admin })));
 const Profile = lazy(() => import('@/screens/Profile').then((m) => ({ default: m.Profile })));
 
@@ -49,7 +53,9 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/play" element={<Play />} />
             <Route path="/r/:code" element={<RoomPage />} />
-            <Route path="/practice/:game" element={<Practice />} />
+            <Route path="/party" element={<Party />} />
+            <Route path="/party/:game" element={<Party />} />
+            <Route path="/practice/:game" element={<LegacyPractice />} />
             <Route path="/rules" element={<Rules />} />
             <Route path="/data" element={<DataPolicy />} />
             <Route path="/profile" element={<Profile />} />

@@ -1,5 +1,7 @@
 # Test Pitchside with real (free) football data — 10 minutes
 
+> **Recommended now: `opendata`** (broad: ~39,000 players, 9 leagues 1992–2022 + World Cup squads). Replace `statsbomb` with `opendata` in every command below; try searching **Ashley Young** (Premier League × Inter Milan). Licence note: the transfer archive is for private testing only (see docs/DATA_PROVIDERS.md).
+
 The default data is a small hand-made sample. This guide switches to **StatsBomb Open Data** (free, fetched from GitHub, no key) and gives you a way to verify it yourself.
 
 ## 1. Load the real data (about 2 minutes)

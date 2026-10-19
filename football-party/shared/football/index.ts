@@ -45,8 +45,8 @@ const MAX_TIER: Record<Difficulty, 1 | 2 | 3> = { easy: 1, medium: 2, hard: 3 };
 
 interface SearchEntry {
   player: FootballPlayer;
-  names: string[]; // normalized: name + aliases
-  tokens: string[];
+  /** normalized name + aliases, pre-split into tokens */
+  names: { full: string; tokens: string[] }[];
 }
 
 export interface GridSpec {
@@ -68,6 +68,8 @@ export class FootballIndex {
   private players = new Map<string, FootballPlayer>();
   private affByPlayer = new Map<string, Affiliation[]>();
   private membershipsByTeam = new Map<string, Membership[]>();
+  private affByTeam = new Map<string, Affiliation[]>();
+  private teamsByLeague = new Map<string, Set<string>>();
   private search: SearchEntry[] = [];
   private criterionCache = new Map<string, Set<string>>();
 
@@ -79,17 +81,27 @@ export class FootballIndex {
       const list = this.membershipsByTeam.get(m.teamId) ?? [];
       list.push(m);
       this.membershipsByTeam.set(m.teamId, list);
+      const ts = this.teamsByLeague.get(m.competitionId) ?? new Set();
+      ts.add(m.teamId);
+      this.teamsByLeague.set(m.competitionId, ts);
     }
+    const known = new Set(dataset.players.map((p) => p.id));
     for (const a of dataset.affiliations) {
-      if (!this.teams.has(a.teamId)) continue;
+      if (!this.teams.has(a.teamId) || !known.has(a.playerId)) continue;
       const list = this.affByPlayer.get(a.playerId) ?? [];
       list.push(a);
       this.affByPlayer.set(a.playerId, list);
+      const tl = this.affByTeam.get(a.teamId) ?? [];
+      tl.push(a);
+      this.affByTeam.set(a.teamId, tl);
     }
     for (const p of dataset.players) {
       this.players.set(p.id, p);
       const names = [...new Set([p.name, ...p.aliases].map(normalizeText).filter(Boolean))];
-      this.search.push({ player: p, names, tokens: names.flatMap((n) => n.split(' ')) });
+      this.search.push({
+        player: p,
+        names: names.map((full) => ({ full, tokens: full.split(' ') })),
+      });
     }
   }
 
@@ -140,11 +152,11 @@ export class FootballIndex {
     for (const entry of this.search) {
       if (excludeIds?.has(entry.player.id)) continue;
       let best = 0;
-      for (const name of entry.names) {
+      for (const { full: name, tokens } of entry.names) {
         let s = 0;
         if (name === q) s = 100;
         else if (name.startsWith(q)) s = 80;
-        else if (qTokens.every((qt) => name.split(' ').some((nt) => nt.startsWith(qt)))) s = 60;
+        else if (qTokens.every((qt) => tokens.some((nt) => nt.startsWith(qt)))) s = 60;
         else if (name.includes(q)) s = 40;
         if (s > best) best = s;
       }
@@ -217,8 +229,17 @@ export class FootballIndex {
     const key = this.criterionKey(c);
     let set = this.criterionCache.get(key);
     if (!set) {
+      // Same rules as verdict(), evaluated from the team side so it stays fast on large datasets.
       set = new Set();
-      for (const id of this.players.keys()) if (this.verdict(id, c).ok) set.add(id);
+      if (c.type === 'league') {
+        for (const teamId of this.teamsByLeague.get(c.id) ?? [])
+          for (const a of this.affByTeam.get(teamId) ?? [])
+            if (a.status === 'confirmed' && this.leagueMembershipsOverlap(a, c.id))
+              set.add(a.playerId);
+      } else {
+        for (const a of this.affByTeam.get(c.id) ?? [])
+          if (a.status === 'confirmed') set.add(a.playerId);
+      }
       this.criterionCache.set(key, set);
     }
     return set;
@@ -238,12 +259,13 @@ export class FootballIndex {
   }
 
   /** Every criterion that has any chance of being playable. */
-  criteriaPool(minFamous = 0, clubsMustBeProminent = false): Criterion[] {
+  criteriaPool(minFamous = 0, clubsMustBeProminent = false, minMembers = 2): Criterion[] {
     const out: Criterion[] = [];
     const add = (c: Criterion | null) => {
       if (!c) return;
       const set = this.playersFor(c);
-      if (set.size < 2) return;
+      // Nations are far larger than clubs in World-Cup-based data; scale the bar so Easy/Medium favour big nations.
+      if (set.size < (c.type === 'national' ? minMembers * 2 : minMembers)) return;
       if (clubsMustBeProminent && c.type === 'club' && !isProminentClub(c.label)) return;
       if (minFamous > 0) {
         // Prominence of a criterion = weighted count of its well-known players (tier 1 counts 5x).
@@ -275,21 +297,27 @@ export class FootballIndex {
     const famousNeeded = { easy: 20, medium: 10, hard: 0 }[difficulty];
     // Easy: only recognisable clubs. Medium: recognisable clubs or ones with many well-known players.
     // Final pass relaxes everything so thin datasets still produce a (verified) grid.
-    const passes: [number, boolean][] =
+    // Large datasets contain thousands of tiny clubs: require a minimum squad-history size per criterion.
+    const big = { easy: 40, medium: 20, hard: 12 }[difficulty];
+    const passes: [number, boolean, number][] =
       difficulty === 'easy'
         ? [
-            [0, true],
-            [famousNeeded, false],
-            [0, false],
+            [0, true, big],
+            [famousNeeded, false, big],
+            [0, false, 2],
           ]
         : difficulty === 'medium'
           ? [
-              [famousNeeded, false],
-              [0, false],
+              [0, true, big],
+              [famousNeeded, false, big],
+              [0, false, 2],
             ]
-          : [[0, false]];
-    for (const [minFamous, prominentOnly] of passes) {
-      const pool = this.criteriaPool(minFamous, prominentOnly);
+          : [
+              [0, false, big],
+              [0, false, 2],
+            ];
+    for (const [minFamous, prominentOnly, minMembers] of passes) {
+      const pool = this.criteriaPool(minFamous, prominentOnly, minMembers);
       if (pool.length < 6) continue;
       const ok = (a: Criterion, b: Criterion) =>
         !(a.type === b.type && a.id === b.id) &&
@@ -337,16 +365,28 @@ export class FootballIndex {
     return out;
   }
 
+  /** Finds the league behind a category by id or by (accent-insensitive) name, whatever the dataset calls it. */
+  private leagueForCategory(category: ImpostorCategory): Criterion | null {
+    const names: Partial<Record<ImpostorCategory, string[]>> = {
+      'premier-league': ['premier league'],
+      'la-liga': ['la liga', 'primera division'],
+      'serie-a': ['serie a'],
+      bundesliga: ['bundesliga', '1 bundesliga'],
+      'ligue-1': ['ligue 1'],
+    };
+    const wanted = names[category];
+    if (!wanted) return null;
+    const comp =
+      this.competitions.get(category) ??
+      [...this.competitions.values()].find(
+        (c) => c.kind === 'league' && wanted.includes(normalizeText(c.name)),
+      );
+    return comp ? this.criterionFor('league', comp.id) : null;
+  }
+
   impostorPool(category: ImpostorCategory, difficulty: Difficulty): FootballPlayer[] {
     const maxTier = MAX_TIER[difficulty];
-    const leagueCrit =
-      category === 'premier-league' ||
-      category === 'la-liga' ||
-      category === 'serie-a' ||
-      category === 'bundesliga' ||
-      category === 'ligue-1'
-        ? this.criterionFor('league', category)
-        : null;
+    const leagueCrit = this.leagueForCategory(category);
     const leagueSet = leagueCrit ? this.playersFor(leagueCrit) : null;
     return this.allPlayers().filter((p) => {
       if (p.tier > maxTier || !p.position) return false;

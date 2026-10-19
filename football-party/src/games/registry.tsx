@@ -31,104 +31,123 @@ function ImpostorConfigPanel({
 }: ConfigProps<ImpostorConfig>) {
   const cap = Math.min(3, maxImpostors(Math.max(playerCount, 3)));
   return (
-    <div className="config-grid">
-      <Stepper
-        label="Impostors"
-        value={Math.min(config.impostors, cap)}
-        min={1}
-        max={cap}
-        onChange={(v) => onChange({ impostors: v })}
-        disabled={disabled}
-      />
-      <Stepper
-        label="Rounds"
-        value={config.rounds}
-        min={1}
-        max={8}
-        onChange={(v) => onChange({ rounds: v })}
-        disabled={disabled}
-      />
-      <Stepper
-        label="Clue laps"
-        value={config.clueRounds}
-        min={1}
-        max={3}
-        onChange={(v) => onChange({ clueRounds: v })}
-        disabled={disabled}
-      />
-      <Stepper
-        label="Clue timer"
-        value={config.clueSeconds}
-        min={10}
-        max={90}
-        step={5}
-        suffix="s"
-        onChange={(v) => onChange({ clueSeconds: v })}
-        disabled={disabled}
-      />
-      <Stepper
-        label="Discussion"
-        value={config.discussionSeconds}
-        min={15}
-        max={300}
-        step={15}
-        suffix="s"
-        onChange={(v) => onChange({ discussionSeconds: v })}
-        disabled={disabled}
-      />
-      <Stepper
-        label="Voting timer"
-        value={config.voteSeconds}
-        min={10}
-        max={120}
-        step={5}
-        suffix="s"
-        onChange={(v) => onChange({ voteSeconds: v })}
-        disabled={disabled}
-      />
-      <div className="field span-2">
-        <label htmlFor="cat">Category</label>
-        <select
-          id="cat"
-          className="input"
-          value={config.category}
+    <>
+      <div className="config-grid">
+        <Stepper
+          label="Impostors"
+          value={Math.min(config.impostors, cap)}
+          min={1}
+          max={cap}
+          onChange={(v) => onChange({ impostors: v })}
           disabled={disabled}
-          onChange={(e) => onChange({ category: e.target.value as ImpostorConfig['category'] })}
-        >
-          {Object.entries(IMPOSTOR_CATEGORY_LABELS).map(([k, label]) => (
-            <option key={k} value={k}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="span-2">
-        <Segmented
-          label="Difficulty (how famous)"
-          value={config.difficulty}
-          disabled={disabled}
-          onChange={(v) => onChange({ difficulty: v })}
-          options={[
-            { value: 'easy', label: 'Superstars' },
-            { value: 'medium', label: 'Well known' },
-            { value: 'hard', label: 'Deep cuts' },
-          ]}
         />
-      </div>
-      <div className="span-2">
-        <Segmented
-          label="Impostor gets…"
-          value={config.impostorHint}
+        <Stepper
+          label="Rounds"
+          value={config.rounds}
+          min={1}
+          max={8}
+          onChange={(v) => onChange({ rounds: v })}
           disabled={disabled}
-          onChange={(v) => onChange({ impostorHint: v })}
-          options={[
-            { value: 'none', label: 'No hint' },
-            { value: 'position', label: 'Position' },
-            { value: 'era', label: 'Birth decade' },
-          ]}
         />
+        <div className="field span-2">
+          <label htmlFor="cat">Category</label>
+          <select
+            id="cat"
+            className="input"
+            value={config.category}
+            disabled={disabled}
+            onChange={(e) => onChange({ category: e.target.value as ImpostorConfig['category'] })}
+          >
+            {Object.entries(IMPOSTOR_CATEGORY_LABELS).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="span-2">
+          <Segmented
+            label="Difficulty (how famous)"
+            value={config.difficulty}
+            disabled={disabled}
+            onChange={(v) => onChange({ difficulty: v })}
+            options={[
+              { value: 'easy', label: 'Superstars' },
+              { value: 'medium', label: 'Well known' },
+              { value: 'hard', label: 'Deep cuts' },
+            ]}
+          />
+        </div>
+        <div className="span-2">
+          <Segmented
+            label="Timers"
+            value={config.timers ? 'on' : 'off'}
+            disabled={disabled}
+            onChange={(v) => onChange({ timers: v === 'on' })}
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off — take your time' },
+            ]}
+          />
+        </div>
       </div>
-    </div>
+      <details className="advanced">
+        <summary>Advanced: timers &amp; hints</summary>
+        <div className="config-grid">
+          <Stepper
+            label="Clue laps"
+            value={config.clueRounds}
+            min={1}
+            max={3}
+            onChange={(v) => onChange({ clueRounds: v })}
+            disabled={disabled}
+          />
+          <Stepper
+            label="Clue timer"
+            value={config.clueSeconds}
+            min={10}
+            max={90}
+            step={5}
+            suffix="s"
+            onChange={(v) => onChange({ clueSeconds: v })}
+            disabled={disabled}
+          />
+          <Stepper
+            label="Discussion"
+            value={config.discussionSeconds}
+            min={15}
+            max={300}
+            step={15}
+            suffix="s"
+            onChange={(v) => onChange({ discussionSeconds: v })}
+            disabled={disabled}
+          />
+          <Stepper
+            label="Voting timer"
+            value={config.voteSeconds}
+            min={10}
+            max={120}
+            step={5}
+            suffix="s"
+            onChange={(v) => onChange({ voteSeconds: v })}
+            disabled={disabled}
+          />
+          <div className="span-2">
+            <Segmented
+              label="Impostor gets…"
+              value={config.impostorHint}
+              disabled={disabled}
+              onChange={(v) => onChange({ impostorHint: v })}
+              options={[
+                { value: 'none', label: 'No hint' },
+                { value: 'position', label: 'Position' },
+                { value: 'era', label: 'Birth decade' },
+              ]}
+            />
+          </div>
+        </div>
+      </details>
+    </>
   );
 }
 
@@ -164,14 +183,20 @@ function TttConfigPanel({ config, onChange, disabled }: ConfigProps<TttConfig>) 
       <div className="span-2">
         <Segmented
           label="Turn timer"
-          value={config.turnSeconds}
+          value={!config.timers ? 'off' : config.turnSeconds}
           disabled={disabled}
-          onChange={(v) => onChange({ turnSeconds: v })}
+          onChange={(v) =>
+            v === 'off'
+              ? onChange({ timers: false })
+              : onChange({ timers: true, turnSeconds: Number(v) })
+          }
           options={[
+            { value: 'off', label: 'Off' },
             { value: 20, label: '20s' },
             { value: 30, label: '30s' },
             { value: 45, label: '45s' },
             { value: 60, label: '60s' },
+            { value: 120, label: '2 min' },
           ]}
         />
       </div>

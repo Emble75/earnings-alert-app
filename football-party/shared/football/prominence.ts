@@ -2,22 +2,57 @@ import { normalizeText } from './normalize';
 
 /**
  * Clubs a casual fan is likely to recognise. This is NOT football data and asserts no facts about
- * players or seasons — it only steers Easy/Medium grid generation away from obscure clubs when the
- * dataset has no popularity signal of its own (e.g. StatsBomb Open Data). Matching is by normalized
- * name; unknown names simply don't match. Extend freely.
+ * players or seasons — it only steers Easy/Medium grid generation away from obscure clubs (reserve
+ * teams, lower-league sides) when a dataset has no popularity signal of its own. Matching ignores
+ * legal-form tokens ("FC", "AFC", "SSC", …) so "Juventus FC" and "Juventus" are the same club.
  */
+const NOISE = new Set([
+  'fc',
+  'afc',
+  'cf',
+  'ssc',
+  'sl',
+  'sc',
+  'ac',
+  'as',
+  'ss',
+  'bc',
+  'cfc',
+  'calcio',
+  'sv',
+  'vfl',
+  'vfb',
+  'cp',
+  '04',
+  '1899',
+  '1909',
+  'rcd',
+  'cd',
+  'ud',
+  'sad',
+]);
+const canon = (name: string) =>
+  normalizeText(name)
+    .split(' ')
+    .filter((t) => t && !NOISE.has(t))
+    .join(' ');
+
 const NAMES = [
   'Barcelona',
-  'FC Barcelona',
   'Real Madrid',
   'Atletico Madrid',
   'Sevilla',
   'Valencia',
   'Villarreal',
-  'Athletic Club',
   'Athletic Bilbao',
+  'Athletic Club',
   'Real Sociedad',
   'Real Betis',
+  'Deportivo La Coruna',
+  'Espanyol',
+  'Celta Vigo',
+  'Malaga',
+  'Valladolid',
   'Manchester United',
   'Manchester City',
   'Liverpool',
@@ -29,38 +64,59 @@ const NAMES = [
   'Newcastle United',
   'West Ham United',
   'Aston Villa',
+  'Leeds United',
+  'Southampton',
+  'Fulham',
+  'Blackburn Rovers',
+  'Sunderland',
+  'Wolverhampton Wanderers',
   'Bayern Munich',
   'Borussia Dortmund',
   'Bayer Leverkusen',
-  'Schalke 04',
+  'Schalke',
   'RB Leipzig',
+  'Werder Bremen',
+  'Hamburger',
+  'Wolfsburg',
+  'Borussia Monchengladbach',
+  'Eintracht Frankfurt',
+  'VfB Stuttgart',
   'Juventus',
   'Inter Milan',
   'Inter',
-  'AC Milan',
   'Milan',
   'Napoli',
-  'AS Roma',
   'Roma',
   'Lazio',
   'Fiorentina',
+  'Atalanta',
+  'Parma',
+  'Sampdoria',
+  'Udinese',
+  'Torino',
+  'Genoa',
   'Paris Saint-Germain',
   'Paris Saint Germain',
   'Marseille',
-  'Olympique de Marseille',
+  'Olympique Marseille',
   'Lyon',
-  'Olympique Lyonnais',
-  'AS Monaco',
+  'Olympique Lyon',
   'Monaco',
+  'Lille',
+  'Bordeaux',
+  'Nice',
+  'Saint-Etienne',
   'Ajax',
+  'Ajax Amsterdam',
   'PSV Eindhoven',
+  'Feyenoord',
   'Benfica',
-  'FC Porto',
   'Porto',
-  'Sporting CP',
-  'Celtic',
-  'Rangers',
+  'Sporting',
+  'Zenit St Petersburg',
+  'Spartak Moscow',
+  'CSKA Moscow',
 ];
-const SET = new Set(NAMES.map(normalizeText));
+const SET = new Set(NAMES.map(canon));
 
-export const isProminentClub = (name: string) => SET.has(normalizeText(name));
+export const isProminentClub = (name: string) => SET.has(canon(name));

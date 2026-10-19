@@ -1,4 +1,6 @@
+import { gzipSync } from 'node:zlib';
 import { FootballIndex } from '../../shared/football';
+import { compactDataset } from '../../shared/football/wire';
 import { normalizeText } from '../../shared/football/normalize';
 import type { Dataset } from '../../shared/football/types';
 import { sampleDataset } from '../../data/sample/sample';
@@ -12,6 +14,7 @@ import { sampleProvider } from './providers/sample';
 import { fileProvider } from './providers/file';
 import { wikidataProvider } from './providers/wikidata';
 import { statsbombProvider } from './providers/statsbomb';
+import { openDataProvider } from './providers/opendata';
 
 export interface Conflict {
   entityType: string;
@@ -55,6 +58,33 @@ export function sanitizeDataset(ds: Dataset): { dataset: Dataset; conflicts: Con
     return true;
   });
 
+  // Exact duplicates (same natural key) are collapsed and reported, never silently dropped.
+  const dedupe = <T>(items: T[], keyOf: (x: T) => string, entityType: string): T[] => {
+    const seenKeys = new Set<string>();
+    let dropped = 0;
+    const out = items.filter((x) =>
+      seenKeys.has(keyOf(x)) ? (dropped++, false) : (seenKeys.add(keyOf(x)), true),
+    );
+    if (dropped)
+      conflicts.push({
+        entityType,
+        entityId: '*',
+        kind: 'duplicate-records-collapsed',
+        details: { dropped },
+      });
+    return out;
+  };
+  const uniqueAffiliations = dedupe(
+    affiliations,
+    (a) => `${a.playerId}|${a.teamId}|${a.fromSeason ?? 'x'}|${a.toSeason ?? 'x'}`,
+    'affiliation',
+  );
+  const uniqueMemberships = dedupe(
+    memberships,
+    (m) => `${m.teamId}|${m.competitionId}|${m.fromSeason}`,
+    'membership',
+  );
+
   // Possible duplicate people: same normalized name and birth year under different ids. We do NOT
   // auto-merge (no fuzzy identity guessing); we surface them for review.
   const seen = new Map<string, string>();
@@ -73,7 +103,11 @@ export function sanitizeDataset(ds: Dataset): { dataset: Dataset; conflicts: Con
   }
   // Affiliation spells that overlap at two different clubs in the same season are legitimate
   // (loans, mid-season moves) so they are not flagged; contradictory memberships are.
-  const filtered: Dataset = { ...ds, affiliations, memberships };
+  const filtered: Dataset = {
+    ...ds,
+    affiliations: uniqueAffiliations,
+    memberships: uniqueMemberships,
+  };
   for (const msg of checkDatasetIntegrity(filtered).filter((m) =>
     m.includes('overlapping memberships'),
   )) {
@@ -104,6 +138,8 @@ const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v)
 
 export function createProvider(config: Config): FootballProvider {
   switch (config.FOOTBALL_PROVIDER) {
+    case 'opendata':
+      return openDataProvider({ cacheDir: config.OPENDATA_CACHE_DIR });
     case 'statsbomb':
       return statsbombProvider({
         cacheDir: config.STATSBOMB_CACHE_DIR,
@@ -143,6 +179,17 @@ export class FootballService {
 
   get index() {
     return this._index;
+  }
+
+  private gz: { index: FootballIndex; buf: Buffer } | null = null;
+  /** The whole active dataset as gzipped JSON (public football facts), cached per index build. */
+  datasetGzip(): Buffer {
+    if (this.gz?.index !== this._index)
+      this.gz = {
+        index: this._index,
+        buf: gzipSync(JSON.stringify(compactDataset(this._index.dataset)), { level: 6 }),
+      };
+    return this.gz.buf;
   }
 
   /** Loads the active source from the DB, seeding the sample dataset when nothing is there yet. */

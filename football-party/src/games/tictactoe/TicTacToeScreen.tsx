@@ -5,7 +5,17 @@ import type { TttView } from '@shared/games/tictactoe';
 import { cue } from '@/lib/prefs';
 import type { RoomController } from '@/lib/room-controller';
 import { Monogram, useToast } from '@/ui/kit';
-import { Countdown, FinalPanel, Live, Standings, gameAction, nameOf } from '../shared';
+import {
+  Countdown,
+  FinalPanel,
+  Live,
+  NoTimer,
+  Standings,
+  gameAction,
+  nameOf,
+  useAct,
+} from '../shared';
+import { Button } from '@/ui/kit';
 import { PlayerPicker } from './PlayerPicker';
 
 const SIDE = ['X', 'O'] as const;
@@ -31,6 +41,8 @@ export function TicTacToeScreen({ ctl }: { ctl: RoomController }) {
   const { view } = ctl;
   const v = view.game!.view as TttView;
   const toast = useToast();
+  const act = useAct(ctl);
+  const isHost = view.you === view.hostId || ctl.mode === 'local';
   const mySide = v.teams[0].includes(view.you) ? 0 : v.teams[1].includes(view.you) ? 1 : null;
   const myTurn = v.phase === 'playing' && v.turnPlayerId === view.you;
   const [pickCell, setPickCell] = useState<number | null>(null);
@@ -119,9 +131,12 @@ export function TicTacToeScreen({ ctl }: { ctl: RoomController }) {
           <div className="eyebrow lime">
             Round {v.round}/{v.totalRounds}
           </div>
-          {v.phase === 'playing' && (
-            <Countdown deadline={v.deadline} offset={ctl.clockOffset} label="Turn time left" />
-          )}
+          {v.phase === 'playing' &&
+            (v.config.timers ? (
+              <Countdown deadline={v.deadline} offset={ctl.clockOffset} label="Turn time left" />
+            ) : (
+              <NoTimer />
+            ))}
         </div>
       </header>
 
@@ -146,8 +161,24 @@ export function TicTacToeScreen({ ctl }: { ctl: RoomController }) {
                 : `${SIDE[v.roundWinner]} take it · ${sideNames(v.roundWinner)}`}
             </div>
           </div>
-          <span className="field-hint">Next round starts shortly…</span>
+          {v.deadline === null ? (
+            isHost ? (
+              <Button size="sm" onClick={() => act(gameAction({ type: 'next' }))}>
+                Next round
+              </Button>
+            ) : (
+              <span className="field-hint">Waiting for the host to start the next round…</span>
+            )
+          ) : (
+            <span className="field-hint">Next round starts shortly…</span>
+          )}
         </div>
+      )}
+
+      {isHost && !v.config.timers && v.phase === 'playing' && !myTurn && (
+        <Button variant="ghost" size="sm" onClick={() => act(gameAction({ type: 'skip' }))}>
+          Skip {turnName}’s turn (host)
+        </Button>
       )}
 
       <Board

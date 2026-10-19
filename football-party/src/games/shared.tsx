@@ -19,6 +19,18 @@ export function useAct(ctl: RoomController) {
   };
 }
 
+/** Shown instead of a countdown when the host switched timers off. */
+export function NoTimer() {
+  return (
+    <span
+      className="chip"
+      title="Timers are off: phases end when everyone is done or the host skips ahead"
+    >
+      No timer
+    </span>
+  );
+}
+
 export const gameAction = (action: unknown) => ({ type: 'game.action' as const, action });
 
 export function nameOf(view: RoomView, id: string | null | undefined) {

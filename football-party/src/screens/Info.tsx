@@ -23,8 +23,8 @@ export function Rules() {
               <li key={r}>{r}</li>
             ))}
           </ol>
-          <LinkButton to={`/practice/${g.id}`} variant="secondary" size="sm">
-            Practice offline
+          <LinkButton to={`/party/${g.id}`} variant="secondary" size="sm">
+            Play on one phone
           </LinkButton>
         </section>
       ))}

@@ -3,6 +3,8 @@ import type { Criterion, GridSpec, PlayerCard } from '../football';
 import { GameError, type GameContext, type GameModule } from './types';
 
 export const TttConfigSchema = z.object({
+  /** false = untimed: a turn lasts until the player moves (or the host skips it). */
+  timers: z.boolean().default(true),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
   rounds: z.union([z.literal(1), z.literal(3), z.literal(5)]).default(3),
   turnSeconds: z.number().int().min(10).max(120).default(30),
@@ -16,6 +18,7 @@ export const TttActionSchema = z.discriminatedUnion('type', [
     playerId: z.string().min(1).max(80),
   }),
   z.object({ type: z.literal('next') }), // host: skip the between-rounds pause
+  z.object({ type: z.literal('skip') }), // host: pass the current turn (AFK player)
 ]);
 export type TttAction = z.infer<typeof TttActionSchema>;
 
@@ -88,6 +91,8 @@ export const LINES = [
   [0, 4, 8],
   [2, 4, 6],
 ];
+const dl = (cfg: { timers: boolean }, ctx: { now: number }, ms: number) =>
+  cfg.timers ? ctx.now + ms : null;
 const BETWEEN_ROUNDS_MS = 8000;
 const DISCONNECT_SKIP_MS = 3000;
 export const TTT_MAX_PLAYERS = 8;
@@ -138,7 +143,7 @@ function startRoundState(prev: TttState, ctx: GameContext): TttState {
     event: null,
     roundWinner: null,
     line: null,
-    deadline: ctx.now + prev.config.turnSeconds * 1000,
+    deadline: dl(prev.config, ctx, prev.config.turnSeconds * 1000),
   };
 }
 
@@ -163,7 +168,7 @@ function finishRound(
   const over =
     next.round >= next.config.rounds || next.sideWins[0] >= need || next.sideWins[1] >= need;
   next.phase = over ? 'final' : 'round-over';
-  next.deadline = over ? null : ctx.now + BETWEEN_ROUNDS_MS;
+  next.deadline = over ? null : dl(next.config, ctx, BETWEEN_ROUNDS_MS);
   return next;
 }
 
@@ -174,7 +179,7 @@ function pushEvent(s: TttState, e: Omit<TttEvent, 'seq'>) {
 
 function passTurn(s: TttState, ctx: GameContext) {
   s.turn += 1;
-  s.deadline = ctx.now + s.config.turnSeconds * 1000;
+  s.deadline = dl(s.config, ctx, s.config.turnSeconds * 1000);
 }
 
 function settle(state: TttState, ctx: GameContext): TttState {
@@ -183,8 +188,10 @@ function settle(state: TttState, ctx: GameContext): TttState {
     if (s.phase === 'playing') {
       const online = new Set(ctx.players.filter((p) => p.connected).map((p) => p.id));
       const who = turnPlayer(s);
-      if (!online.has(who) && s.deadline !== null && s.deadline > ctx.now + DISCONNECT_SKIP_MS) {
+      if (!online.has(who) && (s.deadline === null || s.deadline > ctx.now + DISCONNECT_SKIP_MS)) {
         s = { ...s, deadline: ctx.now + DISCONNECT_SKIP_MS };
+      } else if (online.has(who) && !s.config.timers && s.deadline !== null) {
+        s = { ...s, deadline: null }; // reconnected in time; untimed games have no other deadline
       }
       if (s.deadline !== null && s.deadline <= ctx.now) {
         const c = structuredClone(s);
@@ -246,6 +253,19 @@ export const ticTacToeGame: GameModule<TttConfig, TttState, TttAction, TttView> 
   },
 
   reduce(state, action, actorId, ctx) {
+    if (action.type === 'skip') {
+      if (state.phase !== 'playing') throw new GameError('wrong-phase', 'The round is over.');
+      const c = structuredClone(settle(state, ctx));
+      pushEvent(c, {
+        kind: 'timeout',
+        by: turnPlayer(c),
+        cell: null,
+        name: null,
+        message: 'The host skipped this turn.',
+      });
+      passTurn(c, ctx);
+      return settle(c, ctx);
+    }
     if (action.type === 'next') {
       if (state.phase !== 'round-over') throw new GameError('wrong-phase', 'No pause to skip.');
       return settle(startRoundState(state, ctx), ctx);
@@ -301,7 +321,7 @@ export const ticTacToeGame: GameModule<TttConfig, TttState, TttAction, TttView> 
     return settle(next, ctx);
   },
 
-  hostOnly: (a) => a.type === 'next',
+  hostOnly: (a) => a.type === 'next' || a.type === 'skip',
   tick: (s, ctx) => settle(s, ctx),
   sync: (s, ctx) => settle(s, ctx),
   deadline: (s) => s.deadline,

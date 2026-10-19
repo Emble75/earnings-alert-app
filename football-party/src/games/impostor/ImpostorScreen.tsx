@@ -13,7 +13,16 @@ import type { ImpostorView } from '@shared/games/impostor';
 import { cue } from '@/lib/prefs';
 import type { RoomController } from '@/lib/room-controller';
 import { Avatar, Button, Field } from '@/ui/kit';
-import { Countdown, FinalPanel, Live, Standings, gameAction, nameOf, useAct } from '../shared';
+import {
+  Countdown,
+  FinalPanel,
+  Live,
+  NoTimer,
+  Standings,
+  gameAction,
+  nameOf,
+  useAct,
+} from '../shared';
 
 const PHASE_LABEL = {
   reveal: 'Kick-off',
@@ -62,13 +71,20 @@ export function ImpostorScreen({ ctl }: { ctl: RoomController }) {
           </div>
           <h2 className="phase-title">{PHASE_LABEL[v.phase]}</h2>
         </div>
-        <Countdown deadline={v.deadline} offset={ctl.clockOffset} label="Phase time left" />
+        {v.config.timers ? (
+          <Countdown deadline={v.deadline} offset={ctl.clockOffset} label="Phase time left" />
+        ) : (
+          <NoTimer />
+        )}
       </header>
 
       {v.phase === 'reveal' && <RevealPhase ctl={ctl} v={v} act={act} />}
-      {v.phase === 'clues' && <CluesPhase ctl={ctl} v={v} act={act} />}
+      {v.phase === 'clues' && v.config.spoken && <SpokenCluesPhase ctl={ctl} v={v} act={act} />}
+      {v.phase === 'clues' && !v.config.spoken && (
+        <CluesPhase ctl={ctl} v={v} act={act} isHost={isHost} />
+      )}
       {v.phase === 'discussion' && <DiscussionPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
-      {v.phase === 'voting' && <VotingPhase ctl={ctl} v={v} act={act} />}
+      {v.phase === 'voting' && <VotingPhase ctl={ctl} v={v} act={act} isHost={isHost} />}
       {v.phase === 'result' && (
         <>
           <ResultCard ctl={ctl} v={v} />
@@ -222,7 +238,66 @@ function ClueList({ ctl, v }: { ctl: RoomController; v: ImpostorView }) {
   );
 }
 
-function CluesPhase({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
+/** In-person play: nobody types. The app just shows who speaks next and moves the turn along. */
+function SpokenCluesPhase({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
+  const { view } = ctl;
+  const speaker = nameOf(view, v.turnPlayerId);
+  const last = v.turnIndex >= v.turnOrder.length - 1;
+  return (
+    <div className="two-col">
+      <div className="stack">
+        <div className="turn-banner mine">
+          <Avatar id={v.turnPlayerId ?? ''} name={speaker} size={52} />
+          <div>
+            <div className="eyebrow">Say it out loud</div>
+            <div className="turn-name">{speaker}, give your clue</div>
+          </div>
+        </div>
+        <Live>{`${speaker} is giving a clue out loud.`}</Live>
+        <p className="lede">
+          One word or a short phrase — never the name. Everyone else listens for clues that fit… or
+          try too hard.
+        </p>
+        <Button size="lg" onClick={() => act(gameAction({ type: 'advance' }))}>
+          <SkipForward aria-hidden size={20} />{' '}
+          {last ? 'Done — on to the discussion' : 'Done — next speaker'}
+        </Button>
+        <p className="field-hint">
+          Lap {v.clueRound} of {v.clueRounds}.
+        </p>
+      </div>
+      <aside className="card" aria-label="Speaking order">
+        <div className="eyebrow">Speaking order · lap {v.clueRound}</div>
+        <ol className="speak-order">
+          {v.turnOrder.map((id, i) => (
+            <li key={id} className={i === v.turnIndex ? 'now' : i < v.turnIndex ? 'done' : ''}>
+              <Avatar id={id} name={nameOf(view, id)} size={28} />
+              <span>{nameOf(view, id)}</span>
+              <span className="spacer" />
+              {i < v.turnIndex ? (
+                <Check size={16} aria-label="done" />
+              ) : i === v.turnIndex ? (
+                <span className="chip lime">speaking</span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </aside>
+    </div>
+  );
+}
+
+function CluesPhase({
+  ctl,
+  v,
+  act,
+  isHost,
+}: {
+  ctl: RoomController;
+  v: ImpostorView;
+  act: Act;
+  isHost: boolean;
+}) {
   const { view } = ctl;
   const mine = v.turnPlayerId === view.you;
   const [text, setText] = useState('');
@@ -299,6 +374,15 @@ function CluesPhase({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act
         ) : (
           <p className="lede">Listen for clues that fit — or that try a little too hard.</p>
         )}
+        {isHost && !v.config.timers && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => act(gameAction({ type: 'advance' }))}
+          >
+            <SkipForward aria-hidden size={16} /> Skip this clue (host)
+          </Button>
+        )}
         <details className="peek">
           <summary>Peek at my role</summary>
           <RoleCard v={v} />
@@ -336,19 +420,33 @@ function DiscussionPhase({
         ) : (
           <p className="field-hint">Voting opens when the clock ends or the host skips ahead.</p>
         )}
-        <details className="peek">
-          <summary>Peek at my role</summary>
-          <RoleCard v={v} />
-        </details>
+        {!v.config.spoken && (
+          <details className="peek">
+            <summary>Peek at my role</summary>
+            <RoleCard v={v} />
+          </details>
+        )}
       </div>
-      <aside className="card" aria-label="All clues">
-        <ClueList ctl={ctl} v={v} />
-      </aside>
+      {!v.config.spoken && (
+        <aside className="card" aria-label="All clues">
+          <ClueList ctl={ctl} v={v} />
+        </aside>
+      )}
     </div>
   );
 }
 
-function VotingPhase({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; act: Act }) {
+function VotingPhase({
+  ctl,
+  v,
+  act,
+  isHost,
+}: {
+  ctl: RoomController;
+  v: ImpostorView;
+  act: Act;
+  isHost: boolean;
+}) {
   const { view } = ctl;
   const others = v.participants.filter((p) => p !== view.you);
   const mine = v.you.voted;
@@ -383,6 +481,11 @@ function VotingPhase({ ctl, v, act }: { ctl: RoomController; v: ImpostorView; ac
           <UserX aria-hidden size={18} />{' '}
           {mine === 'skip' ? 'Skipping this vote' : 'I can’t tell — skip'}
         </Button>
+        {isHost && !v.config.timers && (
+          <Button variant="ghost" size="sm" onClick={() => act(gameAction({ type: 'advance' }))}>
+            <Gavel aria-hidden size={16} /> Close voting now (host)
+          </Button>
+        )}
       </div>
       <aside className="card" aria-label="Voting progress">
         <div className="eyebrow">Votes in</div>

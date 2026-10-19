@@ -6,7 +6,9 @@ Mobile-first, installable (PWA) party games for friends: open a link, make or jo
 - **Football Tic-Tac-Toe** — each row/column is a club, nation or league; name a footballer who fits both. Every answer is validated **on the server** against dated records.
 - **Game framework** — modular registry (`shared/games`), shared rooms/identity/timers/scoring, plus an **offline practice mode** (clearly labelled _local, not multiplayer_).
 
-> **Data honesty.** The default dataset is a small **hand-curated sample** (97 players, 20 clubs, snapshot 2024-25), labelled "sample" everywhere. For **real free data** run `npm run sync -- --provider statsbomb` (StatsBomb Open Data: ~6,800 players, verified from match lineups, partial coverage) — see [docs/TEST_WITH_REAL_DATA.md](docs/TEST_WITH_REAL_DATA.md) and [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
+> **Two ways to play.** _One phone_: pass a single phone around in person (roles and votes are hidden between hand-overs, clues are said out loud; Tic-Tac-Toe also works against the computer). _Online_: everyone on their own phone via a room code. Timers can be switched off in both.
+
+> **Data honesty.** The default dataset is a small **hand-curated sample** (97 players, 20 clubs, snapshot 2024-25), labelled "sample" everywhere. For **broad real data** (~39,000 players, 9 European leagues 1992–2022, World Cup squads) run `npm run sync -- --provider opendata` (private/testing use — see licence notes in docs/DATA_PROVIDERS.md). For a smaller, cleanly verified set run `npm run sync -- --provider statsbomb` (StatsBomb Open Data: ~6,800 players, verified from match lineups, partial coverage) — see [docs/TEST_WITH_REAL_DATA.md](docs/TEST_WITH_REAL_DATA.md) and [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
 ## Quick start
 
@@ -82,7 +84,7 @@ e2e/ tests/        Playwright / Vitest
 ### Real multiplayer vs. local demo
 
 - **Multiplayer** (`/r/CODE`): WebSocket to the server; works across devices. State lives in server memory.
-- **Practice** (`/practice/…`): the same engine runs in your browser with the sample data — Tic-Tac-Toe vs the computer or a friend on one device; Impostor as pass-and-play. Works offline after first load. The UI labels it _Offline practice_ and never claims it's multiplayer.
+- **One phone** (`/party`): the same engine runs in your browser, on the server's active dataset (fetched compactly; falls back to the bundled sample when offline). Tic-Tac-Toe: 2–8 friends in teams, or vs the computer. Impostor: 3–8 players, spoken clues. The UI says it's not online multiplayer.
 
 ## Football data & sync
 
@@ -129,7 +131,7 @@ Landing page; create/join by code or link; guest nicknames; optional device-loca
 | `prettier --check` / `eslint` / `tsc --noEmit`                                  | clean                                                                                                                                                                                                                     |
 | Vitest (PGlite)                                                                 | 78 tests, 7 files, all passing                                                                                                                                                                                            |
 | Vitest against PostgreSQL 16 (`TEST_DATABASE_URL`)                              | 78 tests, all passing                                                                                                                                                                                                     |
-| Playwright (mobile 390×844 + desktop 1280×800)                                  | 14 tests passing: landing, invalid codes, 3-device Impostor round with rematch, 2-device Tic-Tac-Toe with server validation + reload-reconnect + rejected answer, empty search state, offline practice vs bot, PWA assets |
+| Playwright (mobile 390×844 + desktop 1280×800)                                  | 20 tests passing: landing, invalid codes, 3-device Impostor round with rematch, 2-device Tic-Tac-Toe with server validation + reload-reconnect + rejected answer, empty search state, offline practice vs bot, PWA assets |
 | axe-core (WCAG 2 A/AA) on play, lobby, Tic-Tac-Toe, role card, mobile + desktop | 0 violations                                                                                                                                                                                                              |
 | Production build                                                                | client ≈ 95 kB gzip initial JS; game engine chunk ≈ 43 kB gzip loads on room entry                                                                                                                                        |
 

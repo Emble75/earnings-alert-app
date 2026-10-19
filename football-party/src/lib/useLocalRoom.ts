@@ -4,6 +4,7 @@ import type { GameId } from '@shared/games/types';
 import type { ImpostorState } from '@shared/games/impostor';
 import type { TttState } from '@shared/games/tictactoe';
 import { chooseBotMove } from '@shared/games/bot';
+import { getGame } from '@shared/games/registry';
 import {
   addPlayer,
   applyCommand,
@@ -17,11 +18,30 @@ import { randomRng } from '@shared/util/rng';
 import type { RoomController } from './room-controller';
 
 let indexPromise: Promise<FootballIndex> | null = null;
-/** The sample dataset is code-split: only practice mode pays for it. */
-export function loadSampleIndex() {
-  indexPromise ??= import('../../data/sample/sample').then(
-    (m) => new FootballIndex(m.sampleDataset),
-  );
+/**
+ * Football data for the one-phone party mode: the server's active dataset when reachable (so it
+ * plays on the same real data as online rooms), otherwise the bundled sample set (offline).
+ * Code-split: only party mode pays for it.
+ */
+export function loadPartyIndex() {
+  indexPromise ??= (async () => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch('/api/dataset', { signal: ctrl.signal }).finally(() =>
+        clearTimeout(t),
+      );
+      if (res.ok) {
+        // Same-origin, server-produced, compact tuples: expand directly (schema validation already ran server-side).
+        const { expandDataset } = await import('@shared/football/wire');
+        return new FootballIndex(expandDataset(await res.json()));
+      }
+    } catch {
+      /* offline or server unavailable: fall through to the bundled sample */
+    }
+    const m = await import('../../data/sample/sample');
+    return new FootballIndex(m.sampleDataset);
+  })();
   return indexPromise;
 }
 
@@ -76,7 +96,7 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
 
   useEffect(() => {
     let alive = true;
-    loadSampleIndex().then(
+    loadPartyIndex().then(
       (i) => alive && setFootball(i),
       () => alive && setError('Could not load the practice data.'),
     );
@@ -173,7 +193,11 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
       const r = roomRef.current;
       if (!r || !setup) return;
       // Moves belong to whoever holds the device; room-level commands (start, rematch, end) to the host.
-      const actor = cmd.type === 'game.action' ? actingPlayer(r, setup) : r.hostId;
+      // Host-only game actions (skip a turn, close a vote…) are performed by the host, not by whoever holds the phone.
+      const g = r.game ? getGame(r.game.id) : undefined;
+      const parsed = cmd.type === 'game.action' ? g?.actionSchema.safeParse(cmd.action) : undefined;
+      const hostAction = !!(parsed?.success && g?.hostOnly?.(parsed.data));
+      const actor = cmd.type === 'game.action' && !hostAction ? actingPlayer(r, setup) : r.hostId;
       try {
         applyCommand(r, actor, cmd, env());
       } finally {

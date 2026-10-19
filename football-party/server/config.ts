@@ -8,10 +8,13 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().optional(),
   DB_MODE: z.string().optional(),
   PGLITE_DIR: z.string().default('.data/pglite'),
-  FOOTBALL_PROVIDER: z.enum(['sample', 'statsbomb', 'wikidata', 'file']).default('sample'),
+  FOOTBALL_PROVIDER: z
+    .enum(['sample', 'opendata', 'statsbomb', 'wikidata', 'file'])
+    .default('sample'),
   FOOTBALL_IMPORT_FILE: z.string().optional(),
   SYNC_INTERVAL_HOURS: z.coerce.number().min(0).default(0),
   STALE_AFTER_HOURS: z.coerce.number().min(1).default(72),
+  OPENDATA_CACHE_DIR: z.string().default('.data/opendata-cache'),
   STATSBOMB_CACHE_DIR: z.string().default('.data/statsbomb-cache'),
   STATSBOMB_MAX_MATCHES: z.coerce.number().int().min(0).default(0),
   WIKIDATA_USER_AGENT: z.string().optional(),

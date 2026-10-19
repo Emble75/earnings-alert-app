@@ -13,6 +13,21 @@ Research was done on 2026-10-19 from this build environment. **Official provider
 | football-data.org            | Competitions/teams/squads; free tier reported as current-season only, 12 competitions         | Free: 10 req/min; paid plans from ~€12/mo (reported)                                          | Sources disagree on whether the free tier includes player data. Not suitable for history. |
 | Sportmonks                   | Teams, squads, players, transfers                                                             | League-based plans from ~€29/mo; free plan covers 2 leagues (reported)                        | Terms/logo rights not verified.                                                           |
 
+## Update 2: broad coverage via "opendata" (transfers + World Cup squads)
+
+StatsBomb alone misses most careers (e.g. Ashley Young at Premier League and Inter). `opendata` (`server/football/providers/opendata.ts`) combines two GitHub datasets, both fetched live in this environment:
+
+| Dataset              | What it gives                                                                                                                                                                                                        | Licence                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ewenme/transfers`   | Every transfer of 9 leagues (Premier League, Championship, La Liga, Serie A, Bundesliga, Ligue 1, Eredivisie, Liga NOS, Russian PL), 1992/93–2022/23 → club spells with season ranges, league memberships, positions | **No licence file; derived from Transfermarkt.** Use for private testing only. Do not ship publicly/commercially on it without permission. |
+| `jfjelstul/worldcup` | Men's World Cup squads 1930–2022 → national teams, exact birth years                                                                                                                                                 | CC-BY-SA 4.0 (attribution + share-alike)                                                                                                   |
+
+Result of the last live sync: **39,010 players · 5,874 teams · 136,600 dated affiliations**; 38/38 checkable spot-facts correct, 0 wrong (`npm run data:report -- --source opendata`).
+
+How careers are reconstructed: arrival and departure transfer windows → season ranges (summer departure in year Y ⇒ last season Y−1; winter ⇒ Y). Loans and returns become separate spells. Counterpart club names that differ between files ("Man Utd" vs "Manchester United") are unified by pairing the same transfer's two rows; unmatched ones are real outside clubs (known, dates unknown ⇒ valid for club squares only). Players have no ids in the source, so identity = name + birth-year estimate from transfer ages; World Cup links need name **and** birth year to agree. Ages outside 14–50 are ignored.
+
+Limits: the archive stops in 2022 (no 2023+ moves); only moves involving the 9 leagues are recorded (a player who only ever played elsewhere is absent); nations are World-Cup-squad only (no Euro/Copa-only players); fame tiers are a proxy (transfer fees + World Cup appearances).
+
 ## Update: StatsBomb Open Data — tested live, now the recommended free source
 
 After the sandbox could only reach `raw.githubusercontent.com`, StatsBomb's public open-data repository turned out to be a better free source than Wikidata for _verifiability_: facts come from real match lineups (a player is affiliated with a team for a season only if they **played** for it; a club is in a league for a season only if it **played a league match**). It needs no key and was **fetched and validated live in this environment**.

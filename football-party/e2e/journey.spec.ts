@@ -30,7 +30,7 @@ async function createRoom(page: Page, name: string) {
   await page.getByRole('button', { name: /create room/i }).click();
   await expect(page).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
   const code = page.url().split('/').pop()!;
-  await expect(page.getByText('Squad')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Squad', exact: true })).toBeVisible();
   return code;
 }
 
@@ -40,7 +40,7 @@ async function joinRoom(page: Page, code: string, name: string) {
   await page.getByRole('textbox', { name: 'Your nickname' }).last().fill(name);
   await page.getByRole('button', { name: /join room/i }).click();
   await expect(page).toHaveURL(new RegExp(`/r/${code}$`));
-  await expect(page.getByText('Squad')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Squad', exact: true })).toBeVisible();
 }
 
 test('landing explains the product and links into play', async ({ page }) => {
@@ -78,6 +78,7 @@ test('football impostor: full multiplayer round across three devices', async ({
   await expect(host.getByText('Cyd')).toBeVisible(); // roster syncs live
 
   // single round, one clue lap
+  await host.getByText('Advanced: timers & hints').click();
   for (const label of ['Rounds', 'Clue laps']) {
     const out = host.getByRole('group', { name: label }).locator('output');
     while (Number(await out.innerText()) > 1) {
@@ -202,7 +203,8 @@ test('football tic-tac-toe: server-validated answers across two devices, with re
 
 test('search shows an empty state for unknown players', async ({ browser }, info) => {
   const page = await newPlayer(browser, info.project.use);
-  await page.goto('/practice/tictactoe');
+  await page.goto('/party/tictactoe');
+  await page.getByRole('radio', { name: 'Computer', exact: true }).click();
   await page.getByRole('button', { name: /kick off/i }).click();
   await expect(page.getByRole('grid')).toBeVisible();
   await expect(page.getByText('Pick a square')).toBeVisible();
@@ -212,27 +214,102 @@ test('search shows an empty state for unknown players', async ({ browser }, info
   await page.context().close();
 });
 
-test('offline practice: play a move against the computer', async ({ browser }, info) => {
+const byLabel = (name: string) => {
+  const t = idx.dataset.teams.find((x) => x.name === name);
+  if (t) return idx.criterionFor(t.kind === 'club' ? 'club' : 'national', t.id)!;
+  return idx.criterionFor('league', idx.dataset.competitions.find((x) => x.name === name)!.id)!;
+};
+
+test('one-phone party: play a move against the computer', async ({ browser }, info) => {
   const page = await newPlayer(browser, info.project.use);
-  await page.goto('/practice/tictactoe');
-  await expect(page.getByText(/not.*online multiplayer/i).first()).toBeVisible();
+  await page.goto('/party/tictactoe');
+  await page.getByRole('radio', { name: 'Computer', exact: true }).click();
   await page.getByRole('button', { name: /kick off/i }).click();
+  await expect(page.getByText(/not.*online multiplayer/i).first()).toBeVisible();
   const label = (await page.getByRole('gridcell').first().getAttribute('aria-label'))!.split(
     ': ',
   )[0]!;
   const [r, c] = label.split(' × ');
-  const byLabel = (name: string) => {
-    const t = idx.dataset.teams.find((x) => x.name === name);
-    if (t) return idx.criterionFor(t.kind === 'club' ? 'club' : 'national', t.id)!;
-    return idx.criterionFor('league', idx.dataset.competitions.find((x) => x.name === name)!.id)!;
-  };
   const name = idx.card(idx.validAnswers(byLabel(r!), byLabel(c!))[0]!)!.name;
   await page.getByRole('gridcell').first().click();
   await page.getByRole('combobox', { name: /search footballers/i }).fill(name);
   await page.getByRole('option', { name }).click();
   await expect(page.getByRole('gridcell').first()).toHaveAttribute('aria-label', new RegExp(name));
-  await expect(page.getByText(/Computer.*:|Computer is thinking/).first()).toBeVisible();
   await page.context().close();
+});
+
+test('one-phone party: three friends pass the phone in Tic-Tac-Toe (teams alternate)', async ({
+  browser,
+}, info) => {
+  const page = await newPlayer(browser, info.project.use);
+  await page.goto('/party/tictactoe');
+  await expect(page.getByText(/X\s*Player 1, Player 3/)).toBeVisible(); // team preview
+  await page.getByRole('button', { name: /kick off/i }).click();
+  await expect(page.getByRole('dialog', { name: /pass the phone to player 1/i })).toBeVisible();
+  await page.getByRole('button', { name: /i’m player 1/i }).click();
+  await expect(page.getByRole('grid')).toBeVisible();
+  const [r, c] = (await page.getByRole('gridcell').first().getAttribute('aria-label'))!
+    .split(': ')[0]!
+    .split(' × ');
+  const name = idx.card(idx.validAnswers(byLabel(r!), byLabel(c!))[0]!)!.name;
+  await page.getByRole('gridcell').first().click();
+  await page.getByRole('combobox', { name: /search footballers/i }).fill(name);
+  await page.getByRole('option', { name }).click();
+  // the board is hidden behind a hand-over screen for the next player (O side starts with Player 2)
+  await expect(page.getByRole('dialog', { name: /pass the phone to player 2/i })).toBeVisible();
+  await expect(page.getByRole('grid')).toHaveCount(0);
+  await page.getByRole('button', { name: /i’m player 2/i }).click();
+  await expect(page.getByRole('gridcell').first()).toHaveAttribute('aria-label', new RegExp(name));
+  await page.context().close();
+});
+
+test('one-phone party: Impostor is spoken (no typing) and keeps secrets between hand-overs', async ({
+  browser,
+}, info) => {
+  const page = await newPlayer(browser, info.project.use);
+  await page.goto('/party/impostor');
+  await page.getByRole('radio', { name: 'Off — take your time' }).click(); // untimed
+  await page.getByRole('button', { name: /kick off/i }).click();
+  let secret = '';
+  const seen: string[] = [];
+  for (let i = 1; i <= 3; i++) {
+    await expect(
+      page.getByRole('dialog', { name: new RegExp(`pass the phone to player ${i}`, 'i') }),
+    ).toBeVisible();
+    if (secret) expect(await page.content()).not.toContain(secret); // previous secret is gone from the DOM
+    await page.getByRole('button', { name: new RegExp(`i’m player ${i}`, 'i') }).click();
+    await page.getByRole('button', { name: /show my role/i }).click();
+    const imp = (await page.locator('.role-card.is-impostor').count()) > 0;
+    seen.push(imp ? 'impostor' : 'crew');
+    if (!imp) secret = (await page.locator('.role-big.name').innerText()).trim();
+    await page.getByRole('button', { name: /got it/i }).click();
+  }
+  expect(seen.filter((x) => x === 'impostor')).toHaveLength(1);
+  // Clues are said out loud: no hand-over, no text box, just "next speaker".
+  await expect(page.getByText(/give your clue/i).first()).toBeVisible();
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await expect(page.getByText(secret)).toHaveCount(0);
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /done — /i }).click();
+  await expect(page.getByRole('heading', { name: /half-time/i })).toBeVisible();
+  await page.getByRole('button', { name: /skip to voting/i }).click();
+  // Each player votes privately after a hand-over.
+  for (let i = 1; i <= 3; i++) {
+    await expect(
+      page.getByRole('dialog', { name: new RegExp(`pass the phone to player ${i}`, 'i') }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: new RegExp(`i’m player ${i}`, 'i') }).click();
+    await page.getByRole('radio').first().click();
+  }
+  await expect(page.getByText('The footballer was')).toBeVisible();
+  await page.context().close();
+});
+
+test('play hub offers one-phone and online modes', async ({ page }) => {
+  await page.goto('/play');
+  await expect(page.getByRole('link', { name: /one phone party mode/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /create room/i })).toBeVisible();
+  await page.goto('/practice/impostor'); // legacy links keep working
+  await expect(page).toHaveURL(/\/party\/impostor/);
 });
 
 test('installable PWA metadata is served', async ({ request }) => {

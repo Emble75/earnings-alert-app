@@ -24,15 +24,15 @@ export class HttpError extends Error {
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 
-/** JSON GET client with polite spacing, retry + exponential backoff + Retry-After support. */
-export function createJsonClient(opts: HttpOptions) {
+/** GET client (JSON or text) with polite spacing, retry + exponential backoff + Retry-After support. */
+export function createClient(opts: HttpOptions) {
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const retries = opts.retries ?? 4;
   const base = opts.baseDelayMs ?? 1000;
   let last = 0;
 
-  return async function getJson<T>(url: string): Promise<T> {
+  async function get<T>(url: string, parse: (res: Response) => Promise<T>): Promise<T> {
     let attempt = 0;
     for (;;) {
       const wait = (opts.minIntervalMs ?? 0) - (Date.now() - last);
@@ -45,13 +45,13 @@ export function createJsonClient(opts: HttpOptions) {
         let res: Response;
         try {
           res = await doFetch(url, {
-            headers: { 'User-Agent': opts.userAgent, Accept: 'application/json' },
+            headers: { 'User-Agent': opts.userAgent, Accept: '*/*' },
             signal: ctrl.signal,
           });
         } finally {
           clearTimeout(timer);
         }
-        if (res.ok) return (await res.json()) as T;
+        if (res.ok) return await parse(res);
         if (!RETRYABLE.has(res.status) || attempt >= retries)
           throw new HttpError(res.status, `HTTP ${res.status} from ${new URL(url).host}`);
         const ra = Number(res.headers.get('retry-after'));
@@ -68,5 +68,13 @@ export function createJsonClient(opts: HttpOptions) {
       }
       attempt += 1;
     }
+  }
+  return {
+    json: <T>(url: string) => get<T>(url, async (r) => (await r.json()) as T),
+    text: (url: string) => get<string>(url, (r) => r.text()),
   };
+}
+
+export function createJsonClient(opts: HttpOptions) {
+  return createClient(opts).json;
 }

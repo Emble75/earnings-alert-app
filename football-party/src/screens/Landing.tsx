@@ -25,8 +25,8 @@ export function Landing() {
             <LinkButton to="/play" size="lg">
               Start a room <ArrowRight aria-hidden />
             </LinkButton>
-            <LinkButton to="/play#join" size="lg" variant="secondary">
-              I have a code
+            <LinkButton to="/party" size="lg" variant="secondary">
+              One phone, pass it around
             </LinkButton>
           </div>
         </div>
@@ -55,8 +55,8 @@ export function Landing() {
                 <LinkButton to="/play" size="sm">
                   Play with friends
                 </LinkButton>
-                <LinkButton to={`/practice/${g.id}`} size="sm" variant="secondary">
-                  Try it offline
+                <LinkButton to={`/party/${g.id}`} size="sm" variant="secondary">
+                  Play on one phone
                 </LinkButton>
               </div>
             </div>
@@ -76,7 +76,10 @@ export function Landing() {
           <li>
             <Smartphone aria-hidden size={28} />
             <h3>Make a room</h3>
-            <p>Pick a nickname. You get a five-letter code and a link.</p>
+            <p>
+              Everyone on their own phone: pick a nickname, get a five-letter code. Or just pass one
+              phone around.
+            </p>
           </li>
           <li>
             <Link2 aria-hidden size={28} />

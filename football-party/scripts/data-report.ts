@@ -59,28 +59,78 @@ type Check = {
   expect: boolean;
 };
 const checks: Check[] = [
-  { player: 'Lionel Messi', kind: 'club', target: 'Barcelona', expect: true },
-  { player: 'Lionel Messi', kind: 'league', target: 'La Liga', expect: true },
+  // `target` may list alternative spellings separated by "|" (sources name clubs differently).
+  { player: 'Ashley Young', kind: 'club', target: 'Aston Villa', expect: true },
+  { player: 'Ashley Young', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
+  {
+    player: 'Ashley Young',
+    kind: 'club',
+    target: 'Inter Milan|Inter|Internazionale',
+    expect: true,
+  },
+  { player: 'Ashley Young', kind: 'league', target: 'Premier League', expect: true },
+  { player: 'Ashley Young', kind: 'league', target: 'Serie A', expect: true },
+  { player: 'Ashley Young', kind: 'club', target: 'Chelsea|Chelsea FC', expect: false },
+  { player: 'Lionel Messi', kind: 'club', target: 'Barcelona|FC Barcelona', expect: true },
+  {
+    player: 'Lionel Messi',
+    kind: 'club',
+    target: 'Paris Saint-Germain|Paris SG|PSG',
+    expect: true,
+  },
+  { player: 'Lionel Messi', kind: 'league', target: 'La Liga|Primera Division', expect: true },
   { player: 'Lionel Messi', kind: 'national', target: 'Argentina', expect: true },
   { player: 'Lionel Messi', kind: 'club', target: 'Real Madrid', expect: false },
+  { player: 'Cristiano Ronaldo', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
   { player: 'Cristiano Ronaldo', kind: 'club', target: 'Real Madrid', expect: true },
-  { player: 'Cristiano Ronaldo', kind: 'club', target: 'Barcelona', expect: false },
+  { player: 'Cristiano Ronaldo', kind: 'club', target: 'Juventus|Juventus FC', expect: true },
+  { player: 'Cristiano Ronaldo', kind: 'club', target: 'Barcelona|FC Barcelona', expect: false },
   { player: 'Cristiano Ronaldo', kind: 'national', target: 'Portugal', expect: true },
-  { player: 'Thierry Henry', kind: 'club', target: 'Arsenal', expect: true },
-  { player: 'Thierry Henry', kind: 'league', target: 'Premier League', expect: true },
-  { player: 'Harry Kane', kind: 'club', target: 'Tottenham Hotspur', expect: true },
-  { player: 'Harry Kane', kind: 'national', target: 'England', expect: true },
-  { player: 'Sergio Agüero', kind: 'club', target: 'Manchester City', expect: true },
-  { player: 'Sergio Agüero', kind: 'club', target: 'Chelsea', expect: false },
-  { player: 'Wayne Rooney', kind: 'club', target: 'Manchester United', expect: true },
-  { player: 'Zlatan Ibrahimović', kind: 'club', target: 'Barcelona', expect: true },
+  { player: 'Thierry Henry', kind: 'club', target: 'Arsenal|Arsenal FC', expect: true },
+  { player: 'Thierry Henry', kind: 'club', target: 'Barcelona|FC Barcelona', expect: true },
+  { player: 'Thierry Henry', kind: 'national', target: 'France', expect: true },
+  { player: 'Romelu Lukaku', kind: 'club', target: 'Chelsea|Chelsea FC', expect: true },
+  { player: 'Romelu Lukaku', kind: 'club', target: 'Inter Milan|Inter', expect: true },
+  { player: 'Romelu Lukaku', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
+  { player: 'Harry Kane', kind: 'club', target: 'Tottenham Hotspur|Spurs', expect: true },
+  { player: 'Harry Kane', kind: 'club', target: 'Bayern Munich', expect: false },
+  { player: 'Sergio Agüero', kind: 'club', target: 'Manchester City|Man City', expect: true },
+  {
+    player: 'Sergio Agüero',
+    kind: 'club',
+    target: 'Atlético Madrid|Atletico Madrid|Atlético de Madrid',
+    expect: true,
+  },
+  { player: 'Wayne Rooney', kind: 'club', target: 'Everton|Everton FC', expect: true },
+  { player: 'Wayne Rooney', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
+  { player: 'Zlatan Ibrahimović', kind: 'club', target: 'Juventus|Juventus FC', expect: true },
+  { player: 'Zlatan Ibrahimović', kind: 'club', target: 'AC Milan|Milan', expect: true },
+  { player: 'Zlatan Ibrahimović', kind: 'club', target: 'Liverpool|Liverpool FC', expect: false },
+  { player: 'Kylian Mbappé', kind: 'club', target: 'AS Monaco|Monaco', expect: true },
   { player: 'Kylian Mbappé', kind: 'national', target: 'France', expect: true },
+  { player: 'Luka Modrić', kind: 'club', target: 'Tottenham Hotspur|Spurs', expect: true },
   { player: 'Luka Modrić', kind: 'national', target: 'Croatia', expect: true },
+  { player: 'Gareth Bale', kind: 'club', target: 'Real Madrid', expect: true },
+  { player: 'Gareth Bale', kind: 'club', target: 'Tottenham Hotspur|Spurs', expect: true },
+  { player: 'Paul Pogba', kind: 'club', target: 'Juventus|Juventus FC', expect: true },
+  { player: 'Paul Pogba', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
 ];
-const findTeam = (name: string, kind: 'club' | 'national') =>
-  ds.teams.find((t) => t.kind === kind && normalizeText(t.name) === normalizeText(name));
-const findLeague = (name: string) =>
-  ds.competitions.find((c) => c.kind === 'league' && normalizeText(c.name) === normalizeText(name));
+const findTeam = (names: string, kind: 'club' | 'national') => {
+  for (const n of names.split('|')) {
+    const t = ds.teams.find((x) => x.kind === kind && normalizeText(x.name) === normalizeText(n));
+    if (t) return t;
+  }
+  return undefined;
+};
+const findLeague = (names: string) =>
+  names
+    .split('|')
+    .map((n) =>
+      ds.competitions.find(
+        (c) => c.kind === 'league' && normalizeText(c.name) === normalizeText(n),
+      ),
+    )
+    .find(Boolean);
 
 line('\n--- Spot checks against well-known facts ---');
 let pass = 0,

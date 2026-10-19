@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { TttState } from '../shared/games/tictactoe';
-import { advanceTime, applyCommand, cmd, football, makeEnv, makeRoom } from './helpers';
+import {
+  advanceMany,
+  advanceTime,
+  applyCommand,
+  cmd,
+  football,
+  makeEnv,
+  makeRoom,
+} from './helpers';
 import type { Room } from '../shared/room/types';
 
 const st = (room: Room) => room.game!.state as TttState;
@@ -184,5 +192,38 @@ describe('football tic-tac-toe', () => {
     applyCommand(room, 'a', cmd.select('tictactoe'), empty);
     expect(() => applyCommand(room, 'a', cmd.start(), empty)).toThrowError(/can’t support/);
     expect(room.status).toBe('lobby');
+  });
+});
+
+describe('tic-tac-toe with timers switched off', () => {
+  it('waits for the player indefinitely; the host can skip the turn and start the next round', () => {
+    const { room, env } = start(['ana', 'ben'], { timers: false, rounds: 3 });
+    expect(st(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000);
+    expect(turn(room)).toBe('ana');
+    expect(st(room).event).toBeNull();
+    expect(() => applyCommand(room, 'ben', cmd.act({ type: 'skip' }), env)).toThrowError(/host/);
+    applyCommand(room, 'ana', cmd.act({ type: 'skip' }), env);
+    expect(turn(room)).toBe('ben');
+    expect(st(room).event?.message).toMatch(/host skipped/i);
+    expect(st(room).deadline).toBeNull();
+    // finish a round: it must wait for the host instead of auto-starting
+    const plan: [string, number][] = [
+      ['ben', 0],
+      ['ana', 3],
+      ['ben', 1],
+      ['ana', 4],
+      ['ben', 2],
+    ];
+    for (const [who, cell] of plan) {
+      if (who === 'ben') guess(room, who, cell, answerFor(room, cell), env);
+      else guess(room, who, cell, wrongFor(room, cell), env);
+    }
+    expect(st(room).phase).toBe('round-over');
+    expect(st(room).deadline).toBeNull();
+    advanceMany(room, env, 600_000, 5000);
+    expect(st(room).round).toBe(1);
+    applyCommand(room, 'ana', cmd.act({ type: 'next' }), env);
+    expect(st(room).round).toBe(2);
   });
 });

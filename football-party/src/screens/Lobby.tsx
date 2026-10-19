@@ -48,6 +48,7 @@ export function Lobby({ ctl }: { ctl: RoomController }) {
       </section>
 
       <section className="roster card" aria-labelledby="roster-h">
+        <div className="eyebrow">02 · Who’s in</div>
         <div className="row">
           <h2 id="roster-h" className="card-title" style={{ margin: 0 }}>
             Squad
@@ -135,6 +136,7 @@ export function Lobby({ ctl }: { ctl: RoomController }) {
       </section>
 
       <section className="card settings" aria-labelledby="settings-h">
+        <div className="eyebrow">04 · Match settings</div>
         <div className="row">
           <h2 id="settings-h" className="card-title" style={{ margin: 0 }}>
             Settings
