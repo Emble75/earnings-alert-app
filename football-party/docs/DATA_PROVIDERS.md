@@ -13,9 +13,19 @@ Research was done on 2026-10-19 from this build environment. **Official provider
 | football-data.org            | Competitions/teams/squads; free tier reported as current-season only, 12 competitions         | Free: 10 req/min; paid plans from ~€12/mo (reported)                                          | Sources disagree on whether the free tier includes player data. Not suitable for history. |
 | Sportmonks                   | Teams, squads, players, transfers                                                             | League-based plans from ~€29/mo; free plan covers 2 leagues (reported)                        | Terms/logo rights not verified.                                                           |
 
+## Update: StatsBomb Open Data — tested live, now the recommended free source
+
+After the sandbox could only reach `raw.githubusercontent.com`, StatsBomb's public open-data repository turned out to be a better free source than Wikidata for _verifiability_: facts come from real match lineups (a player is affiliated with a team for a season only if they **played** for it; a club is in a league for a season only if it **played a league match**). It needs no key and was **fetched and validated live in this environment**.
+
+- Implemented in `server/football/providers/statsbomb.ts`; run `npm run sync -- --provider statsbomb` (see [TEST_WITH_REAL_DATA.md](TEST_WITH_REAL_DATA.md)).
+- Result of the last live sync: 6,791 players · 218 teams · 9,453 dated affiliations · 211 league-season memberships · 0 conflicts. Spot checks of 17 well-known facts: 17 correct, 0 wrong.
+- **Partial by design**: selected competitions only (men's: La Liga 2004/05–2020/21 mostly Barcelona's matches plus a 1973/74 season, Premier League 2003/04 and 2015/16, Serie A 2015/16 and 1986/87, Ligue 1 2015/16 + 2021/22 + 2022/23, Bundesliga 2015/16 + 2023/24, and World Cups, Euros, Copa América, AFCON for national teams). True facts outside these seasons are missing, so the game rejects them as "not confirmed".
+- **No popularity or birth-year signal**: fame tiers are a proxy (appearances + tournament participation) and `shared/football/prominence.ts` holds a small list of recognisable clubs to keep Easy/Medium grids sensible.
+- **Terms** (repository README): when publishing or sharing analysis/insights based on the data, credit StatsBomb and use their logo from the Media Pack. The app shows textual attribution on `/data`; the **logo is not bundled** — add it from StatsBomb's Media Pack if you publish publicly. The README doesn't address commercial use: confirm with StatsBomb before commercial deployment.
+
 ## Decision
 
-1. **Wikidata is the implemented live provider** (`server/football/providers/wikidata.ts`): it is the only free source found that models dated club history, it has a permissive licence, and it needs no secret.
+1. **StatsBomb Open Data is the recommended free provider today** (see update above). **Wikidata is also implemented** (`server/football/providers/wikidata.ts`): it is the only free source found that models dated club history, it has a permissive licence, and it needs no secret.
 2. It is **not complete or authoritative**. The adapter therefore treats anything it cannot date unambiguously as `year`/`unknown` precision, and those records are _excluded_ from league validation (see below).
 3. **The adapter has not been run against the live service** from this environment (egress to wikidata.org was blocked). Its parsing and season derivation are unit-tested against fixtures in the documented `wbgetentities` shape. First step after deploying: `npm run sync -- --provider wikidata` and inspect `/admin`.
 4. For a production-grade dataset the likely best path is a paid provider with a transfers/career endpoint (API-Football or Sportmonks) behind the same `FootballProvider` interface — **not implemented**, because it cannot be built or tested without credentials and without reading the provider's terms. See "Adding a provider".

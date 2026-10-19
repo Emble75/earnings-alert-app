@@ -34,7 +34,10 @@ function wrongFor(room: Room, cell: number) {
   const c = s.grid.cols[cell % 3]!;
   return football
     .allPlayers()
-    .find((p) => !football.verdict(p.id, r).ok || !football.verdict(p.id, c).ok)!.id;
+    .find(
+      (p) =>
+        !s.used.includes(p.id) && (!football.verdict(p.id, r).ok || !football.verdict(p.id, c).ok),
+    )!.id;
 }
 
 describe('football tic-tac-toe', () => {

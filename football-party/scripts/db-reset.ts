@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadDotEnv } from './_env';
+import { loadDotEnv } from '../server/env';
 import { loadConfig } from '../server/config';
 import { createLogger } from '../server/log';
 import { openDb } from '../server/db';

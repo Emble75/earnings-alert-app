@@ -212,7 +212,7 @@ export function DataNotice({
         <strong>{sample ? 'Sample football data' : data.label}.</strong>{' '}
         {sample
           ? `A small hand-curated set (snapshot ${date}), not live or complete — answers outside it can’t be verified.`
-          : `Data as of ${date}. Anything the source can’t date precisely is excluded from validation.`}{' '}
+          : `Data as of ${date}. Coverage is partial: anything the source can’t confirm (or date precisely) is treated as unknown and never accepted.`}{' '}
         <Link to="/data">How this works</Link>
       </span>
     </aside>

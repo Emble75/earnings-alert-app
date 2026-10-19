@@ -11,6 +11,7 @@ import { countSource, loadDataset, saveDataset, SyncGuardError } from './reposit
 import { sampleProvider } from './providers/sample';
 import { fileProvider } from './providers/file';
 import { wikidataProvider } from './providers/wikidata';
+import { statsbombProvider } from './providers/statsbomb';
 
 export interface Conflict {
   entityType: string;
@@ -103,6 +104,11 @@ const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v)
 
 export function createProvider(config: Config): FootballProvider {
   switch (config.FOOTBALL_PROVIDER) {
+    case 'statsbomb':
+      return statsbombProvider({
+        cacheDir: config.STATSBOMB_CACHE_DIR,
+        maxMatchesPerSeason: config.STATSBOMB_MAX_MATCHES,
+      });
     case 'wikidata':
       return wikidataProvider({
         userAgent:

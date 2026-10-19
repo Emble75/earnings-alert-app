@@ -6,7 +6,7 @@ Mobile-first, installable (PWA) party games for friends: open a link, make or jo
 - **Football Tic-Tac-Toe** — each row/column is a club, nation or league; name a footballer who fits both. Every answer is validated **on the server** against dated records.
 - **Game framework** — modular registry (`shared/games`), shared rooms/identity/timers/scoring, plus an **offline practice mode** (clearly labelled _local, not multiplayer_).
 
-> **Data honesty.** The bundled football dataset is a small **hand-curated sample** (97 players, 20 clubs, snapshot 2024-25). It is labelled "sample" everywhere and is not live or complete. See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
+> **Data honesty.** The default dataset is a small **hand-curated sample** (97 players, 20 clubs, snapshot 2024-25), labelled "sample" everywhere. For **real free data** run `npm run sync -- --provider statsbomb` (StatsBomb Open Data: ~6,800 players, verified from match lineups, partial coverage) — see [docs/TEST_WITH_REAL_DATA.md](docs/TEST_WITH_REAL_DATA.md) and [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
 ## Quick start
 
@@ -89,6 +89,8 @@ e2e/ tests/        Playwright / Vitest
 See [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md) for the provider research, what is and isn't verified, validation rules and how to add a provider.
 
 ```bash
+npm run sync -- --provider statsbomb      # free, no key, verified live (cached in .data/)
+npm run data:report -- --source statsbomb # quality report + spot checks
 npm run sync                              # sample (no-op after seeding)
 WIKIDATA_USER_AGENT="Pitchside/0.1 (https://you.example; you@example.com)" \
   npm run sync -- --provider wikidata     # live Wikidata (see caveat: untested live)
@@ -133,7 +135,7 @@ Landing page; create/join by code or link; guest nicknames; optional device-loca
 
 ## Known limitations
 
-- **Football data is sample-only out of the box**; the Wikidata adapter is unit-tested on fixtures but **was not run against the live service** (egress blocked in the build sandbox). Commercial providers (API-Football, Sportmonks…) are researched but **not implemented** (need keys + terms review).
+- **Out of the box the data is the sample set.** The free StatsBomb data was synced and played live here, but it is partial (selected competitions/seasons; true facts outside them are rejected as "not confirmed") and has no birth years. The Wikidata adapter is unit-tested on fixtures but **was not run against the live service** (egress blocked in the build sandbox). Commercial providers (API-Football, Sportmonks…) are researched but **not implemented** (need keys + terms review).
 - Official provider docs/terms could not be fetched here; pricing and limits in the research are third-party-reported.
 - Rooms are in-memory and single-instance; a server restart ends running games.
 - League validation uses season granularity; mid-season loans and winter moves are treated as "registered that season".

@@ -1,4 +1,5 @@
 import 'node:process';
+import { loadDotEnv } from './env';
 import { loadConfig } from './config';
 import { createLogger, errInfo } from './log';
 import { openDb } from './db';
@@ -53,6 +54,7 @@ if (
   process.argv[1]?.endsWith('server/main.ts') ||
   process.argv[1]?.endsWith('dist-server/main.js')
 ) {
+  loadDotEnv();
   startServer().catch((e) => {
     console.error('fatal: could not start', e instanceof Error ? e.message : e);
     process.exit(1);

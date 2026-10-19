@@ -1,5 +1,6 @@
 import { shuffle, type Rng } from '../util/rng';
 import { normalizeText } from './normalize';
+import { isProminentClub } from './prominence';
 import type {
   Affiliation,
   Competition,
@@ -223,50 +224,98 @@ export class FootballIndex {
     return set;
   }
 
+  private pairCache = new Map<string, string[]>();
   validAnswers(a: Criterion, b: Criterion): string[] {
-    const A = this.playersFor(a);
-    const B = this.playersFor(b);
-    return [...A].filter((id) => B.has(id));
+    const key = `${a.type}:${a.id}|${b.type}:${b.id}`;
+    let hit = this.pairCache.get(key);
+    if (!hit) {
+      const A = this.playersFor(a);
+      const B = this.playersFor(b);
+      hit = [...A].filter((id) => B.has(id));
+      this.pairCache.set(key, hit);
+    }
+    return hit;
   }
 
   /** Every criterion that has any chance of being playable. */
-  criteriaPool(): Criterion[] {
+  criteriaPool(minFamous = 0, clubsMustBeProminent = false): Criterion[] {
     const out: Criterion[] = [];
-    for (const t of this.teams.values()) {
-      const c = this.criterionFor(t.kind === 'club' ? 'club' : 'national', t.id);
-      if (c && this.playersFor(c).size >= 2) out.push(c);
-    }
-    for (const comp of this.competitions.values()) {
-      if (comp.kind !== 'league') continue;
-      const c = this.criterionFor('league', comp.id);
-      if (c && this.playersFor(c).size >= 2) out.push(c);
-    }
+    const add = (c: Criterion | null) => {
+      if (!c) return;
+      const set = this.playersFor(c);
+      if (set.size < 2) return;
+      if (clubsMustBeProminent && c.type === 'club' && !isProminentClub(c.label)) return;
+      if (minFamous > 0) {
+        // Prominence of a criterion = weighted count of its well-known players (tier 1 counts 5x).
+        let score = 0;
+        for (const id of set) {
+          const t = this.players.get(id)!.tier;
+          score += t === 1 ? 5 : t === 2 ? 1 : 0;
+          if (score >= minFamous) break;
+        }
+        if (score < minFamous) return;
+      }
+      out.push(c);
+    };
+    for (const t of this.teams.values())
+      add(this.criterionFor(t.kind === 'club' ? 'club' : 'national', t.id));
+    for (const comp of this.competitions.values())
+      if (comp.kind === 'league') add(this.criterionFor('league', comp.id));
     return out;
   }
 
   /**
    * Builds a 3x3 grid where every one of the 9 cells has at least the difficulty's minimum number
-   * of validated answers. Returns null if the dataset cannot support one: the game is then
-   * unplayable rather than guessing.
+   * of validated answers. Easier grids prefer well-known criteria (those with many well-known
+   * players) so the board feels fair; if the data can't support that, it relaxes to any verifiable
+   * criteria. Returns null if even that is impossible: the game is then unplayable, never guessed.
    */
   generateGrid(rng: Rng, difficulty: Difficulty): GridSpec | null {
     const minAnswers = DIFFICULTY_MIN_ANSWERS[difficulty];
-    const pool = this.criteriaPool();
-    if (pool.length < 6) return null;
-    for (let attempt = 0; attempt < 400; attempt++) {
-      const rows = shuffle(pool, rng).slice(0, 3);
-      // Constructive: only criteria that are answerable against every chosen row can be columns.
-      const candidates = shuffle(pool, rng).filter(
-        (c) =>
-          !rows.some((r) => r.type === c.type && r.id === c.id) &&
-          rows.every(
-            (r) => !this.isTrivialPair(r, c) && this.validAnswers(r, c).length >= minAnswers,
-          ),
-      );
-      if (candidates.length < 3) continue;
-      const cols = candidates.slice(0, 3);
-      const counts = rows.flatMap((r) => cols.map((c) => this.validAnswers(r, c).length));
-      return { rows, cols, answerCounts: counts };
+    const famousNeeded = { easy: 20, medium: 10, hard: 0 }[difficulty];
+    // Easy: only recognisable clubs. Medium: recognisable clubs or ones with many well-known players.
+    // Final pass relaxes everything so thin datasets still produce a (verified) grid.
+    const passes: [number, boolean][] =
+      difficulty === 'easy'
+        ? [
+            [0, true],
+            [famousNeeded, false],
+            [0, false],
+          ]
+        : difficulty === 'medium'
+          ? [
+              [famousNeeded, false],
+              [0, false],
+            ]
+          : [[0, false]];
+    for (const [minFamous, prominentOnly] of passes) {
+      const pool = this.criteriaPool(minFamous, prominentOnly);
+      if (pool.length < 6) continue;
+      const ok = (a: Criterion, b: Criterion) =>
+        !(a.type === b.type && a.id === b.id) &&
+        !this.isTrivialPair(a, b) &&
+        this.validAnswers(a, b).length >= minAnswers;
+      for (let attempt = 0; attempt < 300; attempt++) {
+        // Constructive: add rows one at a time, always keeping >= 3 columns compatible with every row so far.
+        const rows: Criterion[] = [];
+        let cand = pool;
+        for (let k = 0; k < 3; k++) {
+          const next = shuffle(pool, rng).find(
+            (r) => !rows.includes(r) && cand.filter((c) => c !== r && ok(r, c)).length >= 3,
+          );
+          if (!next) break;
+          rows.push(next);
+          cand = cand.filter((c) => c !== next && ok(next, c));
+        }
+        if (rows.length < 3) continue;
+        const cols = shuffle(
+          cand.filter((c) => !rows.includes(c)),
+          rng,
+        ).slice(0, 3);
+        if (cols.length < 3) continue;
+        const counts = rows.flatMap((r) => cols.map((c) => this.validAnswers(r, c).length));
+        return { rows, cols, answerCounts: counts };
+      }
     }
     return null;
   }
