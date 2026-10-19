@@ -1,0 +1,2 @@
+export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 look-alikes
+export const ROOM_CODE_LENGTH = 5;

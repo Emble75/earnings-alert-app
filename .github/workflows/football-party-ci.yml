@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    paths: ['football-party/**']
+  pull_request:
+    paths: ['football-party/**']
+defaults:
+  run:
+    working-directory: football-party
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pitch, POSTGRES_USER: pitch, POSTGRES_DB: pitchtest }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pitch" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://pitch:pitch@localhost:5432/pitchtest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: football-party/package-lock.json }
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx vitest run --no-file-parallelism
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test

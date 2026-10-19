@@ -1,0 +1,16 @@
+# Render blueprint. NOT applied automatically — connect the repo in Render to use it.
+# Single instance only (rooms are in memory). Add DATABASE_URL (Render Postgres / Neon) as a secret.
+services:
+  - type: web
+    name: pitchside
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    numInstances: 1
+    envVars:
+      - key: FOOTBALL_PROVIDER
+        value: sample
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true

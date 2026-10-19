@@ -26,3 +26,7 @@ OPENAI_API_KEY=sk-...
 
 Oder du setzt ihn als Secret in Streamlit Cloud.
 
+
+---
+
+> **Also in this repository:** [`football-party/`](football-party/README.md) — Pitchside, a mobile-first football party-games web app (Football Impostor + Football Tic-Tac-Toe). It is independent of the Streamlit earnings app above.

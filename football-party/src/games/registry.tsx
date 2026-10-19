@@ -1,0 +1,195 @@
+import type { ComponentType } from 'react';
+import type { GameId } from '@shared/games/types';
+import { IMPOSTOR_CATEGORY_LABELS } from '@shared/football';
+import { maxImpostors, type ImpostorConfig } from '@shared/games/impostor';
+import type { TttConfig } from '@shared/games/tictactoe';
+import type { RoomController } from '@/lib/room-controller';
+import { Segmented, Stepper } from '@/ui/kit';
+import { gameMeta, type GameMeta } from './meta';
+import { ImpostorScreen } from './impostor/ImpostorScreen';
+import { TicTacToeScreen } from './tictactoe/TicTacToeScreen';
+
+export interface ConfigProps<C> {
+  config: C;
+  onChange: (patch: Partial<C>) => void;
+  disabled: boolean;
+  playerCount: number;
+}
+
+export interface ClientGame extends GameMeta {
+  Screen: ComponentType<{ ctl: RoomController }>;
+  // Config shape differs per game; the lobby passes the server-validated config through unchanged.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Config: ComponentType<ConfigProps<any>>;
+}
+
+function ImpostorConfigPanel({
+  config,
+  onChange,
+  disabled,
+  playerCount,
+}: ConfigProps<ImpostorConfig>) {
+  const cap = Math.min(3, maxImpostors(Math.max(playerCount, 3)));
+  return (
+    <div className="config-grid">
+      <Stepper
+        label="Impostors"
+        value={Math.min(config.impostors, cap)}
+        min={1}
+        max={cap}
+        onChange={(v) => onChange({ impostors: v })}
+        disabled={disabled}
+      />
+      <Stepper
+        label="Rounds"
+        value={config.rounds}
+        min={1}
+        max={8}
+        onChange={(v) => onChange({ rounds: v })}
+        disabled={disabled}
+      />
+      <Stepper
+        label="Clue laps"
+        value={config.clueRounds}
+        min={1}
+        max={3}
+        onChange={(v) => onChange({ clueRounds: v })}
+        disabled={disabled}
+      />
+      <Stepper
+        label="Clue timer"
+        value={config.clueSeconds}
+        min={10}
+        max={90}
+        step={5}
+        suffix="s"
+        onChange={(v) => onChange({ clueSeconds: v })}
+        disabled={disabled}
+      />
+      <Stepper
+        label="Discussion"
+        value={config.discussionSeconds}
+        min={15}
+        max={300}
+        step={15}
+        suffix="s"
+        onChange={(v) => onChange({ discussionSeconds: v })}
+        disabled={disabled}
+      />
+      <Stepper
+        label="Voting timer"
+        value={config.voteSeconds}
+        min={10}
+        max={120}
+        step={5}
+        suffix="s"
+        onChange={(v) => onChange({ voteSeconds: v })}
+        disabled={disabled}
+      />
+      <div className="field span-2">
+        <label htmlFor="cat">Category</label>
+        <select
+          id="cat"
+          className="input"
+          value={config.category}
+          disabled={disabled}
+          onChange={(e) => onChange({ category: e.target.value as ImpostorConfig['category'] })}
+        >
+          {Object.entries(IMPOSTOR_CATEGORY_LABELS).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Difficulty (how famous)"
+          value={config.difficulty}
+          disabled={disabled}
+          onChange={(v) => onChange({ difficulty: v })}
+          options={[
+            { value: 'easy', label: 'Superstars' },
+            { value: 'medium', label: 'Well known' },
+            { value: 'hard', label: 'Deep cuts' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Impostor gets…"
+          value={config.impostorHint}
+          disabled={disabled}
+          onChange={(v) => onChange({ impostorHint: v })}
+          options={[
+            { value: 'none', label: 'No hint' },
+            { value: 'position', label: 'Position' },
+            { value: 'era', label: 'Birth decade' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TttConfigPanel({ config, onChange, disabled }: ConfigProps<TttConfig>) {
+  return (
+    <div className="config-grid">
+      <div className="span-2">
+        <Segmented
+          label="Difficulty"
+          value={config.difficulty}
+          disabled={disabled}
+          onChange={(v) => onChange({ difficulty: v })}
+          options={[
+            { value: 'easy', label: 'Easy · many answers' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'hard', label: 'Hard · few answers' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Rounds"
+          value={config.rounds}
+          disabled={disabled}
+          onChange={(v) => onChange({ rounds: v })}
+          options={[
+            { value: 1, label: 'Single' },
+            { value: 3, label: 'Best of 3' },
+            { value: 5, label: 'Best of 5' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Turn timer"
+          value={config.turnSeconds}
+          disabled={disabled}
+          onChange={(v) => onChange({ turnSeconds: v })}
+          options={[
+            { value: 20, label: '20s' },
+            { value: 30, label: '30s' },
+            { value: 45, label: '45s' },
+            { value: 60, label: '60s' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+export const clientGames: Record<GameId, ClientGame> = {
+  impostor: {
+    ...gameMeta.impostor,
+    Screen: ImpostorScreen,
+    Config: ImpostorConfigPanel,
+  },
+  tictactoe: {
+    ...gameMeta.tictactoe,
+    Screen: TicTacToeScreen,
+    Config: TttConfigPanel,
+  },
+};
+
+export const clientGameList = Object.values(clientGames);

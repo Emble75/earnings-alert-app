@@ -1,0 +1,27 @@
+{
+  "name": "Pitchside — football party games",
+  "short_name": "Pitchside",
+  "description": "Football Impostor and Football Tic-Tac-Toe for your group chat. No accounts needed.",
+  "start_url": "/play",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a120e",
+  "theme_color": "#0a120e",
+  "categories": ["games", "sports", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Create a room", "short_name": "Create", "url": "/play" },
+    { "name": "Practice offline", "short_name": "Practice", "url": "/practice/tictactoe" }
+  ]
+}
