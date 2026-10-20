@@ -48,7 +48,10 @@ export const TM_FILES = {
   values: ['player_market_value', false],
 } as const;
 export type TmFileKey = keyof typeof TM_FILES;
-export type TmTexts = Record<TmFileKey, string>;
+export type TmTexts = Record<TmFileKey, string> & {
+  /** Optional extra evidence: player_id,club_id,from,to (seasons) — e.g. club appearances. */
+  spells?: string;
+};
 
 const TERMINAL = /^(retired|without club|career break|unknown|ban|suspended|\?)$/i;
 /** Youth/reserve sides are not "clubs" for quiz purposes (Transfermarkt lists them as separate teams). */
@@ -332,6 +335,24 @@ export function buildTransfermarktDataset(files: TmTexts, generatedAt: string): 
       else emit(club, start, start, 'year'); // end not recorded: valid for the club square only
     }
     void lastY;
+  }
+
+  // ---- extra confirmed spells (e.g. from match appearances) ----------------------------------------
+  for (const r of csvRecords(files.spells ?? '')) {
+    const from = num(r.from);
+    const to = num(r.to);
+    if (!profiles.has(r.player_id!) || !isSeniorClub(r.club_id!) || !(to >= from)) continue;
+    const spell: Affiliation = {
+      playerId: `tmk-p${r.player_id}`,
+      teamId: `tmk-c${r.club_id}`,
+      fromSeason: from,
+      toSeason: to,
+      precision: 'season',
+      status: 'confirmed',
+      source: 'transfermarkt',
+    };
+    addAff(spell);
+    clubUse.set(r.club_id!, (clubUse.get(r.club_id!) ?? 0) + 1);
   }
 
   // ---- teams: only clubs that matter (appear in a league table or have enough history) ------------

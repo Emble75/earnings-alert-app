@@ -6,6 +6,7 @@ const t: DcaribouTexts = {
   players: [
     '"player_id","name","date_of_birth","country_of_citizenship","position","current_club_id","highest_market_value_in_eur"',
     '"1","Ann Wing","1990-01-01 00:00:00","England","Attack","10","5000000"',
+    '"200","Cy Late","1995-01-01 00:00:00","England","Defender","20","1000000"',
     ...Array.from(
       { length: 13 },
       (_, i) => `"${100 + i}","Mate ${i}","1991-01-01 00:00:00","England","Attack","10","1000000"`,
@@ -30,6 +31,9 @@ const t: DcaribouTexts = {
       { length: 14 },
       (_, i) => `"a${i}","g1","${i === 0 ? 1 : 99 + i}","900","1","2020-01-01","P","FIWC"`,
     ),
+    '"x1","g2","200","20","20","2019-08-10","Cy Late","XX1"',
+    '"x2","g3","200","20","20","2020-03-01","Cy Late","XX1"',
+    '"x3","g4","200","20","20","2020-09-05","Cy Late","XX1"',
   ].join('\n'),
   national_teams: '"national_team_id","name"\n"900","England"',
 };
@@ -48,6 +52,14 @@ describe('dcaribou provider (fixture)', () => {
       ds.competitions.find((c) => c.name === 'Top League')!.id,
     )!;
     expect(idx.verdict(ann.id, league).ok).toBe(true);
+  });
+  it('derives club spells from match appearances when transfers are missing', () => {
+    const cy = ds.players.find((p) => p.name === 'Cy Late')!;
+    const beta = ds.teams.find((x) => x.name === 'Beta FC')!;
+    const spells = ds.affiliations.filter((a) => a.playerId === cy.id && a.teamId === beta.id);
+    expect(spells.map((a) => [a.fromSeason, a.toSeason])).toEqual([[2019, 2020]]);
+    const club = idx.criterionFor('club', beta.id)!;
+    expect(idx.verdict(cy.id, club).ok).toBe(true);
   });
   it('credits nations only for players with senior appearances', () => {
     const nat = ds.teams.find((x) => x.kind === 'national');

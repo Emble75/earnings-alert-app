@@ -105,11 +105,20 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
     nationalIds.add(r.national_team_id!);
   }
   const caps = new Map<string, number>(); // `${player}|${team}` -> matches
+  const played = new Map<string, Set<number>>(); // `${player}|${club}` -> seasons with a club appearance
   chk = true;
   for (const r of csvRecords(t.appearances)) {
     if (chk) need('appearances', r, ['player_id', 'player_club_id']);
     chk = false;
-    if (!nationalIds.has(r.player_club_id!)) continue;
+    if (!nationalIds.has(r.player_club_id!)) {
+      const m = /^(\d{4})-(\d{2})/.exec(r.date ?? '');
+      if (m) {
+        const season = Number(m[2]) >= 7 ? Number(m[1]) : Number(m[1]) - 1;
+        const key = `${r.player_id}|${r.player_club_id}`;
+        (played.get(key) ?? played.set(key, new Set()).get(key)!).add(season);
+      }
+      continue;
+    }
     const k = `${r.player_id}|${r.player_club_id}`;
     caps.set(k, (caps.get(k) ?? 0) + 1);
   }
@@ -117,6 +126,22 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
   for (const [k, n] of caps) {
     const [p, tm] = k.split('|');
     national.push(row(p, tm, n));
+  }
+
+  // consecutive appearance seasons at one club become spells (2012+ careers are complete this way)
+  const spells = ['player_id,club_id,from,to'];
+  for (const [key, set] of played) {
+    const [p, c] = key.split('|');
+    const ys = [...set].sort((a, b) => a - b);
+    let from = ys[0]!;
+    let prev = from;
+    for (const y of [...ys.slice(1), Infinity]) {
+      if (y !== prev + 1) {
+        spells.push(row(p, c, from, prev));
+        from = y;
+      }
+      prev = y;
+    }
   }
 
   // ---- profiles + values ----
@@ -192,6 +217,7 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
     national: national.join('\n'),
     seasons: seasons.join('\n'),
     children: 'parent_team_id,child_team_id\n',
+    spells: spells.join('\n'),
     values: values.join('\n'),
   };
 }
