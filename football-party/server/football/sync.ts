@@ -225,9 +225,11 @@ export class FootballService {
       const rows = await this.db.query<{ source_id: string; n: string }>(
         `SELECT source_id, count(*) AS n FROM players WHERE source_id <> 'sample' GROUP BY source_id`,
       );
-      const best = rows.rows
-        .map((r) => ({ id: r.source_id, n: Number(r.n) }))
-        .sort((a, b) => b.n - a.n)[0];
+      // Preference order, not size: a frozen snapshot, then the freshest/most complete sources.
+      const order = ['import', 'dcaribou', 'transfermarkt', 'opendata', 'statsbomb', 'wikidata'];
+      const have = new Map(rows.rows.map((r) => [r.source_id, Number(r.n)]));
+      const pick = order.find((id) => (have.get(id) ?? 0) >= 1000);
+      const best = pick ? { id: pick, n: have.get(pick)! } : undefined;
       if (best && best.n >= 1000) {
         source = best.id;
         this.log.info('using the largest synced dataset', { source, players: best.n });
