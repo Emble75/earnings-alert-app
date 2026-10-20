@@ -1,5 +1,6 @@
 import { impostorGame } from './impostor';
-import { careerGame, linkUpGame } from './quick';
+import { careerGame, linkUpGame, oddOneGame } from './quick';
+import { whoAreYaGame } from './whoareya';
 import { ticTacToeGame } from './tictactoe';
 import type { AnyGameModule, GameId } from './types';
 
@@ -12,6 +13,8 @@ export const games: Record<GameId, AnyGameModule> = {
   tictactoe: ticTacToeGame,
   linkup: linkUpGame,
   career: careerGame,
+  oddone: oddOneGame,
+  whoareya: whoAreYaGame,
 };
 
 export const gameList = Object.values(games);

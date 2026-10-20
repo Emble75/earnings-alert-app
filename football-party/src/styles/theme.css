@@ -1,0 +1,270 @@
+/* Look & feel layer: a modern sports-app feel (soft surfaces, friendly type, colour per game).
+   Loaded last so it wins over the structural styles. */
+body::before {
+  display: none; /* no paper grain */
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+.eyebrow.lime {
+  color: var(--lime);
+}
+.chip {
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  border-color: var(--line);
+  background: var(--ink-700);
+}
+.mono {
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+/* Buttons: friendly pills, no offset-shadow brutalism */
+.btn {
+  border-width: 0;
+  border-radius: var(--r-pill);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+  min-height: 3rem;
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--bd) 70%, transparent);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    background var(--dur-fast);
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--bd) 80%, transparent);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: none;
+}
+.btn.secondary {
+  --bg: var(--ink-700);
+  --bd: var(--ink-700);
+  box-shadow: none;
+}
+.btn.secondary:hover:not(:disabled) {
+  --bg: var(--ink-600);
+  box-shadow: none;
+}
+.btn.lg {
+  min-height: 3.5rem;
+  font-size: 1.1rem;
+}
+.btn.sm {
+  min-height: 2.5rem;
+  font-size: 0.9rem;
+}
+/* Surfaces */
+.card {
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--hard-shadow);
+}
+.card.paper {
+  border: 0;
+}
+.input,
+select.input {
+  border-radius: var(--r-sm);
+  background: var(--ink-850);
+  border: 1px solid var(--line-strong);
+}
+.site-header {
+  background: color-mix(in srgb, var(--ink-900) 85%, transparent);
+}
+.nav a {
+  font-family: var(--font-body);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- Home ---- */
+.home-title {
+  font-size: clamp(2.4rem, 1.4rem + 5vw, 4.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}
+.home-title .hl {
+  background: none;
+  color: var(--lime);
+  transform: none;
+  padding: 0;
+}
+.home-h {
+  color: var(--chalk);
+  font-size: var(--fs-xl);
+}
+.game-card {
+  --accent: var(--lime);
+  position: relative;
+  overflow: hidden;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  min-height: 15rem;
+  background:
+    radial-gradient(
+      120% 80% at 100% 0%,
+      color-mix(in srgb, var(--accent) 22%, transparent),
+      transparent 60%
+    ),
+    var(--ink-800);
+}
+.game-card[data-game='impostor'] {
+  --accent: #ff5645;
+}
+.game-card[data-game='tictactoe'] {
+  --accent: #d4ff3f;
+}
+.game-card[data-game='linkup'] {
+  --accent: #ffd426;
+}
+.game-card[data-game='career'] {
+  --accent: #6ee7ff;
+}
+.game-card[data-game='oddone'] {
+  --accent: #ff9f43;
+}
+.game-card[data-game='whoareya'] {
+  --accent: #7dffb0;
+}
+.game-card h3 {
+  font-size: 1.6rem;
+}
+.game-card > svg {
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0.55rem;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--ink-950);
+}
+.game-card-cta {
+  margin-top: auto;
+}
+.hero-sub {
+  font-size: var(--fs-md);
+}
+.game-option {
+  border-radius: var(--r-md);
+  border: 2px solid transparent;
+  background: var(--ink-700);
+}
+.game-option.on {
+  border-color: var(--lime);
+  background: var(--lime-wash);
+}
+.go-title {
+  font-family: var(--font-body);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+.step-no {
+  border-radius: 10px;
+}
+
+/* ---- Who Are Ya? / Odd One Out ---- */
+.qoptions {
+  display: grid;
+  gap: var(--s-2);
+  width: 100%;
+}
+.wlist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-3);
+}
+.wrow {
+  background: var(--ink-800);
+  border-radius: var(--r-md);
+  padding: var(--s-3) var(--s-4);
+  display: grid;
+  gap: var(--s-2);
+}
+.wrow.correct {
+  outline: 2px solid var(--lime);
+}
+.wrow-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.wtiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-2);
+}
+.wtile {
+  display: grid;
+  gap: 2px;
+  padding: var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--ink-700);
+  text-align: center;
+  min-width: 0;
+}
+.wtile-t {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.wtile-v {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.wtile.match {
+  background: #1d6a3a;
+}
+.wtile.match .wtile-t {
+  color: #d6ffe8;
+}
+.wtile.older,
+.wtile.younger {
+  background: #b5871c;
+}
+.wtile.older .wtile-t,
+.wtile.younger .wtile-t {
+  color: #fff3cf;
+}
+.wclubs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.wclubs.has {
+  color: var(--lime);
+}

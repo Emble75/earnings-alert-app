@@ -3,6 +3,7 @@ import type { DatasetMeta } from '../football/types';
 import type { GameId } from '../games/types';
 import type { ImpostorView } from '../games/impostor';
 import type { QuickView } from '../games/quick';
+import type { WhoAreYaView } from '../games/whoareya';
 import type { TttView } from '../games/tictactoe';
 
 export const MAX_ROOM_PLAYERS = 12;
@@ -37,7 +38,9 @@ export type GameViewEnvelope =
   | { id: 'impostor'; view: ImpostorView }
   | { id: 'tictactoe'; view: TttView }
   | { id: 'linkup'; view: QuickView }
-  | { id: 'career'; view: QuickView };
+  | { id: 'career'; view: QuickView }
+  | { id: 'oddone'; view: QuickView }
+  | { id: 'whoareya'; view: WhoAreYaView };
 
 export interface RoomPlayerView {
   id: string;
@@ -69,7 +72,7 @@ export const NonceSchema = z.string().min(1).max(40).optional();
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('game.select'),
-    gameId: z.enum(['impostor', 'tictactoe', 'linkup', 'career']),
+    gameId: z.enum(['impostor', 'tictactoe', 'linkup', 'career', 'oddone', 'whoareya']),
   }),
   z.object({ type: z.literal('game.config'), config: z.record(z.string(), z.unknown()) }),
   z.object({ type: z.literal('game.start') }),

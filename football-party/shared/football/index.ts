@@ -474,6 +474,61 @@ export class FootballIndex {
     return null;
   }
 
+  /** The player's senior national team, if confirmed. */
+  nationOf(playerId: string): Criterion | null {
+    for (const a of this.affiliationsOf(playerId)) {
+      const t = this.teams.get(a.teamId);
+      if (t && t.kind === 'national' && a.status === 'confirmed')
+        return this.criterionFor('national', t.id);
+    }
+    return null;
+  }
+
+  /**
+   * "Odd one out": three well-known players who played for a club and one well-known player who
+   * did not (and has a rich record, so a missing link is unlikely to be a data gap).
+   */
+  generateOddOne(
+    rng: Rng,
+    difficulty: Difficulty,
+    avoid: ReadonlySet<string> = new Set(),
+  ): { club: Criterion; members: string[]; odd: string } | null {
+    const levels = this.levels();
+    const famous = this.impostorPool('all', difficulty);
+    // strict level first; thin datasets fall back to any club
+    for (const name of [difficulty === 'easy' ? 'easy' : 'medium', 'any']) {
+      const lv = levels[name]!;
+      const clubs = this.criteriaPool(0, false, lv.minMembers).filter(
+        (c) => c.type === 'club' && lv.allowed(c, this.playersFor(c).size),
+      );
+      const hit = this.pickOddOne(rng, famous, clubs, avoid);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  private pickOddOne(
+    rng: Rng,
+    famous: FootballPlayer[],
+    clubs: Criterion[],
+    avoid: ReadonlySet<string>,
+  ): { club: Criterion; members: string[]; odd: string } | null {
+    for (const club of shuffle(clubs, rng).slice(0, 40)) {
+      const members = famous.filter((p) => this.verdict(p.id, club).ok);
+      if (members.length < 4) continue;
+      const outsiders = famous.filter((p) => {
+        if (avoid.has(`${club.id}|${p.id}`)) return false;
+        const v = this.verdict(p.id, club);
+        return !v.ok && v.reason === 'not-confirmed' && this.careerOf(p.id).length >= 3;
+      });
+      if (!outsiders.length) continue;
+      const odd = outsiders[Math.floor(rng() * outsiders.length)]!;
+      const picked = shuffle(members, rng).slice(0, 3);
+      return { club, members: picked.map((p) => p.id), odd: odd.id };
+    }
+    return null;
+  }
+
   /** Clubs a player is known to have played for, oldest first (one entry per club). */
   careerOf(playerId: string): Criterion[] {
     const seen = new Set<string>();

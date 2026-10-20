@@ -33,7 +33,7 @@
   --win: var(--lime);
 
   /* Type */
-  --font-display: 'Big Shoulders Display Variable', 'Arial Narrow', Impact, sans-serif;
+  --font-display: 'Hanken Grotesk Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: 'Hanken Grotesk Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -60,12 +60,12 @@
 
   /* Shape */
   --r-xs: 4px;
-  --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 22px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
   --r-pill: 999px;
-  --hard-shadow: 5px 5px 0 var(--ink-950);
-  --hard-shadow-lime: 4px 4px 0 var(--lime);
+  --hard-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --hard-shadow-lime: 0 8px 24px -10px rgba(212, 255, 63, 0.45);
   --soft-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.7);
 
   /* Motion */

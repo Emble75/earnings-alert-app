@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { Grid3x3, Link2, Route, VenetianMask } from 'lucide-react';
+import { Grid3x3, Link2, Route, ScanSearch, UserSearch, VenetianMask } from 'lucide-react';
 import type { GameId } from '@shared/games/types';
 
 /** Static, dependency-light game descriptions (safe for the landing page bundle). */
@@ -82,6 +82,37 @@ export const gameMeta: Record<GameId, GameMeta> = {
       'You see the clubs a famous footballer played for, oldest first.',
       'In person: shout your guess, the host reveals and taps who got it. Online: search and submit — first correct wins.',
       'Only well-known footballers are used.',
+    ],
+  },
+  oddone: {
+    id: 'oddone',
+    title: 'Odd One Out',
+    kicker: 'Quick fire',
+    tagline: 'Three played for the club. One didn’t. Spot him.',
+    blurb: 'Four footballers, one club. Three of them played there — find the one who never did.',
+    players: '1–12 players',
+    length: '3–8 min',
+    icon: ScanSearch,
+    rules: [
+      'You see a club and four footballers. Three played for the club; one never did.',
+      'In person: say your pick, the host reveals and taps who got it. Online: tap a name — the first correct pick wins; a wrong pick locks you out of that round.',
+    ],
+  },
+  whoareya: {
+    id: 'whoareya',
+    title: 'Who Are Ya?',
+    kicker: 'Guessing game',
+    tagline: 'Guess the hidden footballer from the clues.',
+    blurb:
+      'A famous footballer is hidden. Take turns guessing — each guess tells you how close it is: nation, position, birth year and clubs in common.',
+    players: '1–8 players',
+    length: '5–15 min',
+    icon: UserSearch,
+    rules: [
+      'Take turns naming a footballer. Green means it matches the hidden player.',
+      'Born: the arrow points toward the hidden player’s birth year.',
+      'Shared clubs show where your guess and the hidden player both played.',
+      'Fewer guesses means more points for whoever solves it.',
     ],
   },
 };

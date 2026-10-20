@@ -29,7 +29,7 @@ export function Landing() {
         </h2>
         <div className="games-grid">
           {gameMetaList.map((g) => (
-            <article key={g.id} className="card game-card">
+            <article key={g.id} className="card game-card" data-game={g.id}>
               <g.icon size={32} aria-hidden />
               <div className="eyebrow">{g.kicker}</div>
               <h3>{g.title}</h3>

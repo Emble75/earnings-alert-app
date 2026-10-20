@@ -333,9 +333,16 @@ test('installable PWA metadata is served', async ({ request }) => {
   expect((await request.get('/sw.js')).ok()).toBe(true);
 });
 
-test('home lists four games with one-phone and online entries', async ({ page }) => {
+test('home lists all games with one-phone and online entries', async ({ page }) => {
   await page.goto('/');
-  for (const t of ['Football Impostor', 'Football Tic-Tac-Toe', 'Link-Up', 'Career Path'])
+  for (const t of [
+    'Football Impostor',
+    'Football Tic-Tac-Toe',
+    'Link-Up',
+    'Career Path',
+    'Odd One Out',
+    'Who Are Ya?',
+  ])
     await expect(page.getByRole('heading', { name: t })).toBeVisible();
   await page
     .getByRole('article')
@@ -368,4 +375,21 @@ test('legal pages exist, and no ad consent banner appears while ads are off', as
   await expect(page.getByRole('heading', { name: 'Impressum' })).toBeVisible();
   await page.getByRole('link', { name: 'Datenschutz' }).click();
   await expect(page.getByRole('heading', { name: 'Datenschutzerklärung' })).toBeVisible();
+});
+
+test('one-phone Odd One Out shows a club and four footballers', async ({ page }) => {
+  await page.goto('/party/oddone');
+  await page.getByRole('button', { name: /kick off/i }).click();
+  await expect(page.getByText(/who never played for/i).first()).toBeVisible();
+  await expect(page.locator('.qoptions button')).toHaveCount(4);
+});
+
+test('one-phone Who Are Ya: guess shows clue tiles', async ({ page }) => {
+  await page.goto('/party/whoareya');
+  await page.getByRole('button', { name: /kick off/i }).click();
+  await page.getByRole('button', { name: /make a guess/i }).click();
+  await page.getByRole('combobox').fill('mess');
+  await page.getByRole('option').first().click();
+  await expect(page.locator('.wrow').first()).toBeVisible();
+  await expect(page.locator('.wtile')).toHaveCount(3);
 });

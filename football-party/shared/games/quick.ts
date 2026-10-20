@@ -34,7 +34,8 @@ export interface ClubTile {
 }
 export type QuickPrompt =
   | { kind: 'linkup'; a: Criterion; b: Criterion }
-  | { kind: 'career'; clubs: ClubTile[]; position: string | null };
+  | { kind: 'career'; clubs: ClubTile[]; position: string | null }
+  | { kind: 'oddone'; club: Criterion; options: PlayerCard[] };
 
 export interface QuickEvent {
   seq: number;
@@ -44,7 +45,7 @@ export interface QuickEvent {
 }
 
 export interface QuickState {
-  kind: 'linkup' | 'career';
+  kind: 'linkup' | 'career' | 'oddone';
   config: QuickConfig;
   round: number;
   phase: 'playing' | 'reveal' | 'final';
@@ -79,7 +80,7 @@ export interface QuickView {
   config: QuickConfig;
 }
 
-const MAX_WRONG = 3;
+const maxWrong = (kind: QuickState['kind']) => (kind === 'oddone' ? 1 : 3);
 const REVEAL_MS = 6000;
 const fameOf = (ctx: GameContext, id: string) => ctx.football.fameOf(id);
 
@@ -108,6 +109,29 @@ function startRound(prev: QuickState, ctx: GameContext): QuickState {
     s.prompt = { kind: 'linkup', a: pair.a, b: pair.b };
     s.answers = [...pair.answers].sort((x, y) => fameOf(ctx, y) - fameOf(ctx, x));
     s.target = null;
+    return s;
+  }
+  if (s.kind === 'oddone') {
+    const avoid = new Set(s.used);
+    const set = ctx.football.generateOddOne(ctx.rng, s.config.difficulty, avoid);
+    if (!set) {
+      if (s.round === 1)
+        throw new GameError(
+          'insufficient-data',
+          'Not enough data for this game at this level yet.',
+        );
+      s.round -= 1;
+      s.phase = 'final';
+      s.deadline = null;
+      return s;
+    }
+    s.used.push(`${set.club.id}|${set.odd}`);
+    s.target = set.odd;
+    s.answers = [];
+    const cards = [...set.members, set.odd]
+      .map((id) => ctx.football.card(id)!)
+      .sort((a, b) => a.name.localeCompare(b.name) * (ctx.rng() < 0.5 ? 1 : -1));
+    s.prompt = { kind: 'oddone', club: set.club, options: cards };
     return s;
   }
   const minClubs = { easy: 3, medium: 3, hard: 4 }[s.config.difficulty];
@@ -220,7 +244,7 @@ function makeGame(
           if (s.config.spoken)
             throw new GameError('spoken', 'In person you say the answer out loud.');
           if (s.phase !== 'playing') throw new GameError('wrong-phase', 'This round is over.');
-          if ((s.wrong[actorId] ?? 0) >= MAX_WRONG)
+          if ((s.wrong[actorId] ?? 0) >= maxWrong(s.kind))
             throw new GameError('locked', 'You’re out of guesses this round.');
           const card = ctx.football.card(action.playerId);
           if (!card)
@@ -235,6 +259,11 @@ function makeGame(
               const failed = !v1.ok ? s.prompt.a : s.prompt.b;
               why = `${card.name} isn’t confirmed for ${failed.label}.`;
             }
+          } else if (s.prompt.kind === 'oddone') {
+            if (!s.prompt.options.some((o) => o.id === card.id))
+              throw new GameError('not-an-option', 'Pick one of the four footballers.');
+            ok = card.id === s.target;
+            if (!ok) why = `${card.name} did play for ${s.prompt.club.label}.`;
           } else {
             ok = !!s.target && isTarget(ctx, s.target, card.id);
             if (!ok) why = `Not ${card.name}.`;
@@ -248,7 +277,7 @@ function makeGame(
             return r;
           }
           next.wrong[actorId] = (next.wrong[actorId] ?? 0) + 1;
-          const left = MAX_WRONG - next.wrong[actorId]!;
+          const left = maxWrong(s.kind) - next.wrong[actorId]!;
           push(next, {
             kind: left > 0 ? 'wrong' : 'locked',
             by: actorId,
@@ -291,7 +320,7 @@ function makeGame(
     view(s, _viewer, ctx): QuickView {
       let reveal: PlayerCard[] | null = null;
       if (s.phase !== 'playing') {
-        if (s.kind === 'career' && s.target) {
+        if ((s.kind === 'career' || s.kind === 'oddone') && s.target) {
           const c = ctx.football.card(s.target);
           reveal = c ? [c] : null;
         } else
@@ -312,7 +341,7 @@ function makeGame(
         event: s.event,
         scores: s.scores,
         out: Object.entries(s.wrong)
-          .filter(([, n]) => n >= MAX_WRONG)
+          .filter(([, n]) => n >= maxWrong(s.kind))
           .map(([p]) => p),
         config: s.config,
       };
@@ -333,4 +362,10 @@ export const careerGame = makeGame('career', 'career', {
   title: 'Career Path',
   tagline: 'The clubs, in order. Who is it?',
   seconds: 30,
+});
+
+export const oddOneGame = makeGame('oddone', 'oddone', {
+  title: 'Odd One Out',
+  tagline: 'Three played for the club. One didn’t. Spot him.',
+  seconds: 15,
 });

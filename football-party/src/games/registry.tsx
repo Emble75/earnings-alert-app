@@ -9,6 +9,8 @@ import { gameMeta, type GameMeta } from './meta';
 import { ImpostorScreen } from './impostor/ImpostorScreen';
 import { TicTacToeScreen } from './tictactoe/TicTacToeScreen';
 import { QuickScreen } from './quick/QuickScreen';
+import { WhoAreYaScreen } from './whoareya/WhoAreYaScreen';
+import type { WhoAreYaConfig } from '@shared/games/whoareya';
 import type { QuickConfig } from '@shared/games/quick';
 
 export interface ConfigProps<C> {
@@ -258,6 +260,56 @@ function QuickConfigPanel({ config, onChange, disabled }: ConfigProps<QuickConfi
   );
 }
 
+function WhoAreYaConfigPanel({ config, onChange, disabled }: ConfigProps<WhoAreYaConfig>) {
+  return (
+    <div className="config-grid">
+      <div className="span-2">
+        <Segmented
+          label="Footballers"
+          value={config.difficulty}
+          disabled={disabled}
+          onChange={(v) => onChange({ difficulty: v })}
+          options={[
+            { value: 'easy', label: 'Top 100' },
+            { value: 'medium', label: 'Top 250' },
+            { value: 'hard', label: 'Top 400' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Rounds"
+          value={config.rounds}
+          disabled={disabled}
+          onChange={(v) => onChange({ rounds: v })}
+          options={[
+            { value: 3, label: '3' },
+            { value: 5, label: '5' },
+            { value: 8, label: '8' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Time per guess"
+          value={!config.timers ? 'off' : config.seconds}
+          disabled={disabled}
+          onChange={(v) =>
+            v === 'off'
+              ? onChange({ timers: false })
+              : onChange({ timers: true, seconds: Number(v) })
+          }
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: 30, label: '30s' },
+            { value: 60, label: '60s' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
 export const clientGames: Record<GameId, ClientGame> = {
   impostor: {
     ...gameMeta.impostor,
@@ -271,6 +323,8 @@ export const clientGames: Record<GameId, ClientGame> = {
   },
   linkup: { ...gameMeta.linkup, Screen: QuickScreen, Config: QuickConfigPanel },
   career: { ...gameMeta.career, Screen: QuickScreen, Config: QuickConfigPanel },
+  oddone: { ...gameMeta.oddone, Screen: QuickScreen, Config: QuickConfigPanel },
+  whoareya: { ...gameMeta.whoareya, Screen: WhoAreYaScreen, Config: WhoAreYaConfigPanel },
 };
 
 export const clientGameList = Object.values(clientGames);

@@ -15,8 +15,10 @@ const LIMITS = {
   impostor: { min: 3, max: 8 },
   linkup: { min: 1, max: 8 },
   career: { min: 1, max: 8 },
+  oddone: { min: 1, max: 8 },
+  whoareya: { min: 1, max: 8 },
 } as const;
-const isQuick = (g: GameId) => g === 'linkup' || g === 'career';
+const isQuick = (g: GameId) => g === 'linkup' || g === 'career' || g === 'oddone';
 const NAMES_KEY = 'pitchside.party.names';
 
 /** One-phone party mode: set up, then pass the device around. Same engine as online rooms, in the browser. */
@@ -26,11 +28,7 @@ export function Party() {
   if (!setup)
     return (
       <PartySetup
-        initial={
-          game === 'tictactoe' || game === 'impostor' || game === 'linkup' || game === 'career'
-            ? game
-            : undefined
-        }
+        initial={game && game in LIMITS ? (game as GameId) : undefined}
         onStart={setSetup}
       />
     );
@@ -72,9 +70,20 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
         names: clean,
         config: { difficulty, rounds, timers: timersOn, turnSeconds: secs },
       });
+    else if (game === 'whoareya')
+      onStart({
+        game,
+        names: clean,
+        config: {
+          difficulty: difficulty,
+          rounds: quickRounds,
+          timers: timersOn,
+          seconds: secs,
+        },
+      });
     else if (isQuick(game))
       onStart({
-        game: game as 'linkup' | 'career',
+        game: game as 'linkup' | 'career' | 'oddone',
         names: clean,
         config: {
           difficulty,
@@ -132,7 +141,10 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
                   className={`game-option ${game === g.id ? 'on' : ''}`}
                   onClick={() => {
                     setGame(g.id);
-                    setSecs(g.id === 'career' ? 30 : isQuick(g.id) ? 15 : 45);
+                    setQuickRounds(g.id === 'whoareya' ? 5 : 10);
+                    setSecs(
+                      g.id === 'career' || g.id === 'whoareya' ? 30 : isQuick(g.id) ? 15 : 45,
+                    );
                   }}
                 >
                   <g.icon size={28} aria-hidden />
@@ -230,7 +242,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
             <span className="step-no mono">{initial ? '02' : '03'}</span>
             <h2 id="s3">Settings</h2>
           </div>
-          {game === 'tictactoe' || isQuick(game) ? (
+          {game === 'tictactoe' || game === 'whoareya' || isQuick(game) ? (
             <div className="config-grid">
               <div className="span-2">
                 <Segmented
@@ -245,16 +257,24 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
                 />
               </div>
               <div className="span-2">
-                {isQuick(game) ? (
+                {isQuick(game) || game === 'whoareya' ? (
                   <Segmented
                     label="Rounds"
                     value={quickRounds}
                     onChange={setQuickRounds}
-                    options={[
-                      { value: 5, label: '5' },
-                      { value: 10, label: '10' },
-                      { value: 15, label: '15' },
-                    ]}
+                    options={
+                      game === 'whoareya'
+                        ? [
+                            { value: 3, label: '3' },
+                            { value: 5, label: '5' },
+                            { value: 8, label: '8' },
+                          ]
+                        : [
+                            { value: 5, label: '5' },
+                            { value: 10, label: '10' },
+                            { value: 15, label: '15' },
+                          ]
+                    }
                   />
                 ) : (
                   <Segmented
@@ -285,9 +305,15 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
             </div>
             {timersOn && (
               <div className="span-2">
-                {game === 'tictactoe' || isQuick(game) ? (
+                {game === 'tictactoe' || game === 'whoareya' || isQuick(game) ? (
                   <Stepper
-                    label={isQuick(game) ? 'Seconds per round' : 'Seconds per turn'}
+                    label={
+                      isQuick(game)
+                        ? 'Seconds per round'
+                        : game === 'whoareya'
+                          ? 'Seconds per guess'
+                          : 'Seconds per turn'
+                    }
                     value={secs}
                     min={10}
                     max={180}

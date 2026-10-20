@@ -38,6 +38,12 @@ function Prompt({ v }: { v: QuickView }) {
         <Badge label={p.b.label} short={p.b.short} color={p.b.color} />
       </div>
     );
+  if (p.kind === 'oddone')
+    return (
+      <div className="qprompt" aria-label={`Who never played for ${p.club.label}`}>
+        <Badge label={p.club.label} short={p.club.short} color={p.club.color} />
+      </div>
+    );
   return (
     <div className="qprompt trail" aria-label="Career, oldest club first">
       {p.clubs.map((c: ClubTile, i) => (
@@ -97,7 +103,12 @@ export function QuickScreen({ ctl }: { ctl: RoomController }) {
       toast(e instanceof Error ? e.message : 'That didn’t go through.');
     }
   };
-  const question = v.kind === 'linkup' ? 'Name a footballer who played for both' : 'Who is it?';
+  const question =
+    v.kind === 'linkup'
+      ? 'Name a footballer who played for both'
+      : v.kind === 'oddone' && v.prompt.kind === 'oddone'
+        ? `Who never played for ${v.prompt.club.label}?`
+        : 'Who is it?';
   const players = view.players;
 
   return (
@@ -117,6 +128,21 @@ export function QuickScreen({ ctl }: { ctl: RoomController }) {
       <section className="card qcard">
         <p className="qquestion">{question}</p>
         <Prompt v={v} />
+        {v.prompt.kind === 'oddone' && (
+          <div className="qoptions">
+            {v.prompt.options.map((o) => (
+              <Button
+                key={o.id}
+                variant="secondary"
+                size="lg"
+                disabled={spoken || v.phase !== 'playing' || out}
+                onClick={() => submit(o)}
+              >
+                {o.name}
+              </Button>
+            ))}
+          </div>
+        )}
 
         {v.phase === 'playing' && spoken && (
           <>
@@ -127,7 +153,7 @@ export function QuickScreen({ ctl }: { ctl: RoomController }) {
           </>
         )}
 
-        {v.phase === 'playing' && !spoken && (
+        {v.phase === 'playing' && !spoken && v.kind !== 'oddone' && (
           <>
             <Button size="lg" block disabled={out} onClick={() => setPicking(true)}>
               <Search aria-hidden /> {out ? 'Out of guesses' : 'Name a footballer'}
@@ -142,7 +168,13 @@ export function QuickScreen({ ctl }: { ctl: RoomController }) {
 
         {v.phase === 'reveal' && (
           <div className="qreveal">
-            <div className="eyebrow">{v.kind === 'career' ? 'It was' : 'For example'}</div>
+            <div className="eyebrow">
+              {v.kind === 'career'
+                ? 'It was'
+                : v.kind === 'oddone'
+                  ? 'The odd one out'
+                  : 'For example'}
+            </div>
             <ul className="qanswers">
               {(v.reveal ?? []).map((p) => (
                 <li key={p.id}>{p.name}</li>
