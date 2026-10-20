@@ -142,7 +142,7 @@ export function RoomFrame({
           <p className="banner" style={{ marginBottom: 'var(--s-4)' }}>
             <span>
               <strong>One phone, in person.</strong> Not online multiplayer ·{' '}
-              {view.data.kind === 'sample' ? 'built-in sample data' : view.data.label}
+              {view.data.kind === 'sample' ? 'built-in sample data' : 'real football data'}
             </span>
           </p>
         )}

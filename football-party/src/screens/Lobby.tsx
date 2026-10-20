@@ -211,18 +211,18 @@ export function DataNotice({
     month: 'short',
     day: 'numeric',
   });
+  if (!sample)
+    return (
+      <p className="data-note field-hint">
+        Football data as of {date}. <Link to="/data">How it works</Link>
+      </p>
+    );
   return (
-    <aside
-      className={`banner data-notice ${sample ? '' : 'lime'}`}
-      aria-label="Football data freshness"
-    >
+    <aside className="banner data-notice" aria-label="Football data freshness">
       <Database size={18} aria-hidden style={{ flex: 'none', marginTop: 2 }} />
       <span>
-        <strong>{sample ? 'Sample football data' : data.label}.</strong>{' '}
-        {sample
-          ? `A small hand-curated set (snapshot ${date}), not live or complete — answers outside it can’t be verified.`
-          : `Data as of ${date}. Coverage is partial: anything the source can’t confirm (or date precisely) is treated as unknown and never accepted.`}{' '}
-        <Link to="/data">How this works</Link>
+        <strong>Sample football data.</strong> A small hand-curated set (snapshot {date}), not live
+        or complete — answers outside it can’t be verified. <Link to="/data">How this works</Link>
       </span>
     </aside>
   );
