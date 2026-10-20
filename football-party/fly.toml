@@ -8,7 +8,9 @@ primary_region = "ams"
 [env]
   PORT = "8080"
   NODE_ENV = "production"
-  FOOTBALL_PROVIDER = "sample"
+  # After `npm run data:export` and committing data/pitchside-dataset.json.gz:
+  FOOTBALL_PROVIDER = "file"
+  FOOTBALL_IMPORT_FILE = "data/pitchside-dataset.json.gz"
 
 [http_service]
   internal_port = 8080
