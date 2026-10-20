@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Crown, Database, Loader2, Play, UserMinus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { clientGameList, clientGames } from '@/games/registry';
 import type { RoomController } from '@/lib/room-controller';
 import { Avatar, IconButton, Button, useToast } from '@/ui/kit';
@@ -14,6 +14,13 @@ export function Lobby({ ctl }: { ctl: RoomController }) {
   const connected = view.players.filter((p) => p.connected).length;
   const [starting, setStarting] = useState(false);
   const [kick, setKick] = useState<string | null>(null);
+  const wanted = (useLocation().state as { game?: string } | null)?.game;
+  useEffect(() => {
+    if (isHost && wanted && wanted in clientGames && wanted !== view.gameId)
+      ctl.send({ type: 'game.select', gameId: wanted as never }).catch(() => undefined);
+    // only once, on arrival
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const run = async (cmd: Parameters<RoomController['send']>[0]) => {
     try {

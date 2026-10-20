@@ -1855,3 +1855,11 @@ main#main.container,
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.home-join {
+  margin-top: var(--s-3);
+  color: var(--chalk-dim);
+}
+.home-join a {
+  color: var(--lime);
+  font-weight: 700;
+}

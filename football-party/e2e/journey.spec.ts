@@ -319,8 +319,9 @@ test('one-phone party: timed Impostor discussion starts right away and reveals b
 
 test('play hub offers one-phone and online modes', async ({ page }) => {
   await page.goto('/play');
-  await expect(page.getByRole('link', { name: /one phone party mode/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /create room/i })).toBeVisible();
+  await page.goto('/play?game=linkup');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Link-Up');
   await page.goto('/practice/impostor'); // legacy links keep working
   await expect(page).toHaveURL(/\/party\/impostor/);
 });

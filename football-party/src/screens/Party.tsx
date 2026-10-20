@@ -106,7 +106,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
 
   return (
     <Page narrow>
-      <Link to="/play" className="back-link">
+      <Link to="/" className="back-link">
         <ArrowLeft size={16} aria-hidden /> Back
       </Link>
       <div className="eyebrow lime">One phone · pass it around</div>

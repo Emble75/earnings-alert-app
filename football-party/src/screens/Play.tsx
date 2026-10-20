@@ -1,16 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, DoorOpen, Hand, Plus, Wifi, WifiOff } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { DoorOpen, Plus, WifiOff } from 'lucide-react';
 import { normalizeRoomCode } from '@shared/room/code';
 import { ApiError, api } from '@/lib/api';
 import { nickname } from '@/lib/storage';
-import { Link } from 'react-router-dom';
+import { gameMeta } from '@/games/meta';
 import { Button, Field, PitchLines } from '@/ui/kit';
 import { Page } from './Shell';
 
 export function Play() {
   const nav = useNavigate();
   const { hash } = useLocation();
+  const [params] = useSearchParams();
+  const picked = params.get('game');
+  const game = picked && picked in gameMeta ? gameMeta[picked as keyof typeof gameMeta] : null;
   const [name, setName] = useState(nickname.get());
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
@@ -40,7 +43,7 @@ export function Play() {
     setBusy('create');
     try {
       const seat = await api.createRoom(n);
-      nav(`/r/${seat.code}`);
+      nav(`/r/${seat.code}`, { state: { game: game?.id } });
     } catch (err) {
       if (err instanceof ApiError && err.code === 'invalid-name') setNameErr(err.message);
       else setNetErr(err instanceof Error ? err.message : 'Could not create a room.');
@@ -76,29 +79,9 @@ export function Play() {
   return (
     <Page>
       <div className="play-head">
-        <div className="eyebrow lime">Choose how you play</div>
-        <h1>Get the squad in</h1>
-      </div>
-
-      <Link
-        to="/party"
-        className="party-hero"
-        aria-label="One phone party mode: pass the phone around"
-      >
-        <PitchLines variant="circle" />
-        <Hand size={40} aria-hidden />
-        <div>
-          <div className="eyebrow">No setup needed</div>
-          <h2>One phone, whole squad</h2>
-          <p>Someone starts it, everyone takes turns. Secrets stay hidden between hand-overs.</p>
-        </div>
-        <ArrowRight aria-hidden size={28} className="party-go" />
-      </Link>
-
-      <div className="mode-divider">
-        <span>
-          <Wifi size={14} aria-hidden /> Or play online: everyone on their own phone
-        </span>
+        <div className="eyebrow lime">Online · everyone on their own phone</div>
+        <h1>{game ? game.title : 'Play online'}</h1>
+        {game && <p className="lede">{game.tagline}</p>}
       </div>
 
       <div className="play-grid">
@@ -110,7 +93,7 @@ export function Play() {
         >
           <PitchLines variant="circle" />
           <div className="eyebrow">01 · Host</div>
-          <h2 id="create-h">Create an online room</h2>
+          <h2 id="create-h">{game ? `Host ${game.title}` : 'Create a room'}</h2>
           <Field
             label="Your nickname"
             error={nameErr}
