@@ -373,11 +373,12 @@ test('one-phone Career Path shows a club trail', async ({ page }) => {
   await expect(page.getByLabel(/career, oldest club first/i)).toBeVisible();
 });
 
-test('legal pages exist, and no ad consent banner appears while ads are off', async ({ page }) => {
+test('privacy page exists, imprint stays hidden until configured, and no ad consent banner appears while ads are off', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(page.getByRole('dialog', { name: /advertising/i })).toHaveCount(0);
-  await page.getByRole('link', { name: 'Impressum' }).click();
-  await expect(page.getByRole('heading', { name: 'Impressum' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Impressum' })).toHaveCount(0); // private project: none yet
   await page.getByRole('link', { name: 'Datenschutz' }).click();
   await expect(page.getByRole('heading', { name: 'Datenschutzerklärung' })).toBeVisible();
 });

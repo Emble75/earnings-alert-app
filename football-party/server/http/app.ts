@@ -262,7 +262,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       ),
   );
   app.get('/sitemap.xml', async (_req, reply) => {
-    const paths = ['/', '/rules', '/data', '/play', '/party', '/impressum', '/privacy'];
+    const paths = ['/', '/rules', '/data', '/play', '/party', '/privacy'];
+    if (config.LEGAL_NAME) paths.push('/impressum');
     return reply
       .type('application/xml')
       .send(

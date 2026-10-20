@@ -95,6 +95,11 @@ export function Header({ children }: { children?: ReactNode }) {
   );
 }
 
+function ImprintLink() {
+  const { legal } = useSite();
+  return legal.name ? <Link to="/impressum">Impressum</Link> : null;
+}
+
 function AdSettings() {
   const { ads } = useSite();
   if (!ads) return null;
@@ -117,7 +122,7 @@ export function Footer() {
         </span>
         <span className="row" style={{ gap: 'var(--s-4)' }}>
           <Link to="/rules">Rules</Link>
-          <Link to="/impressum">Impressum</Link>
+          <ImprintLink />
           <Link to="/privacy">Datenschutz</Link>
           <AdSettings />
           <Link to="/data">Data &amp; rights</Link>

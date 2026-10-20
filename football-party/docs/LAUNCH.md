@@ -40,6 +40,10 @@ Test the social preview with the Facebook Sharing Debugger / LinkedIn Post Inspe
 
 ## 3. Legal pages (you)
 
+While this is a private, non-commercial project (no ads, no income) the Impressum is hidden and the privacy
+page names no operator. **Before ads or income:** set `LEGAL_NAME`, `LEGAL_ADDRESS`, `LEGAL_EMAIL` — the
+Impressum link, page and sitemap entry then appear automatically.
+
 `/impressum` and `/privacy` are German templates filled from `LEGAL_*`. Have them reviewed
 (generator such as eRecht24, or a lawyer). No analytics are installed, so none are declared.
 

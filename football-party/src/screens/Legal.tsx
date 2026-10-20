@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom';
 import { useSite } from '@/lib/site';
 import { setConsent, useConsent } from '@/lib/consent';
 import { Button } from '@/ui/kit';
@@ -9,7 +10,9 @@ import { Page } from './Shell';
  */
 export function Impressum() {
   const { legal } = useSite();
-  const missing = !legal.name || !legal.address || !legal.email;
+  // Not shown while the site is a private, non-commercial project (no LEGAL_NAME set).
+  if (!legal.name) return <Navigate to="/" replace />;
+  const missing = !legal.address || !legal.email;
   return (
     <Page narrow>
       <div className="legal">
@@ -58,8 +61,9 @@ export function Privacy() {
         <h1 className="page-title">Datenschutzerklärung</h1>
         <h2>Verantwortlicher</h2>
         <p>
-          {legal.name ?? '[Name]'}, {(legal.address ?? '[Anschrift]').replace(/\n/g, ', ')},{' '}
-          {legal.email ?? '[E-Mail]'}
+          {legal.name
+            ? `${legal.name}${legal.address ? `, ${legal.address.replace(/\n/g, ', ')}` : ''}${legal.email ? `, ${legal.email}` : ''}`
+            : 'Der Betreiber dieser privaten, nicht-kommerziellen Seite.'}
         </p>
         <h2>Was beim Besuch passiert</h2>
         <ul>
