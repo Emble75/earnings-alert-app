@@ -141,7 +141,15 @@ const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v)
 export function createProvider(config: Config): FootballProvider {
   switch (config.FOOTBALL_PROVIDER) {
     case 'dcaribou':
-      return dcaribouProvider({ dir: config.DCARIBOU_DIR ?? '.data/dcaribou' });
+      return dcaribouProvider({
+        dir: config.DCARIBOU_DIR ?? '.data/dcaribou',
+        wikidata: {
+          enabled: config.DCARIBOU_WIKIDATA === 'on',
+          cacheFile: config.WIKIDATA_CAREERS_CACHE,
+          userAgent:
+            config.WIKIDATA_USER_AGENT ?? 'Pitchside/0.1 (football quiz; open-data reader)',
+        },
+      });
     case 'transfermarkt':
       return transfermarktProvider({
         cacheDir: config.TRANSFERMARKT_CACHE_DIR,

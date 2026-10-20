@@ -61,6 +61,17 @@ describe('dcaribou provider (fixture)', () => {
     const club = idx.criterionFor('club', beta.id)!;
     expect(idx.verdict(cy.id, club).ok).toBe(true);
   });
+  it('adds pre-2012 club spells from Wikidata (year precision, club squares only)', () => {
+    const wd = [{ tm: '1', club: '999', clubName: 'Old Town FC', from: 1999, to: 2001 }];
+    const d2 = buildDcaribouDataset(t, '2026-10-20T00:00:00Z', wd);
+    const i2 = new FootballIndex(d2);
+    const old = d2.teams.find((x) => x.name === 'Old Town FC');
+    const ann2 = d2.players.find((p) => p.name === 'Ann Wing')!;
+    expect(old).toBeTruthy();
+    expect(i2.verdict(ann2.id, i2.criterionFor('club', old!.id)!).ok).toBe(true);
+    // year-precision evidence must not prove a league claim
+    expect(d2.affiliations.find((a) => a.teamId === old!.id)?.precision).toBe('year');
+  });
   it('credits nations only for players with senior appearances', () => {
     const nat = ds.teams.find((x) => x.kind === 'national');
     expect(nat?.name).toBe('England');

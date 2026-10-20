@@ -23,6 +23,8 @@ DCARIBOU_DIR=<that folder> FOOTBALL_PROVIDER=dcaribou npm run sync
 npm run data:report -- --source dcaribou
 ```
 
+**Recommended publishable setup.** dcaribou alone is thin before 2012 (its `transfers.csv` has ~480 rows for 2005, ~2,300 for 2010). The provider therefore combines three evidence sources: transfer records, club match appearances (complete 2012+), and — on by default — **Wikidata career statements (CC0)**, matched through Transfermarkt ids (Wikidata P2446/P2448) for notable players (market value ≥ €1m or ≥ 10 caps). Wikidata evidence is year-precision: it proves "played for this club" (club squares) but never a league claim. First run takes several minutes (about 100 polite SPARQL requests) and is cached in `.data/wikidata-careers.json`; if Wikidata is unreachable the sync continues without it. Disable with `DCARIBOU_WIKIDATA=off`. Not live-tested from the build sandbox (Wikidata is blocked there); parsing, caching and failure handling are unit-tested.
+
 Residual risk: the data was scraped from Transfermarkt, whose terms are separate from the CC0 licence — get legal advice before commercial use. Not live-tested in the build sandbox (Kaggle is blocked there); covered by a fixture test using the real column names.
 
 ## Update 3: `transfermarkt` (best free source, data up to Aug 2025)

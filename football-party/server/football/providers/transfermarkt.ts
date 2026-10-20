@@ -51,6 +51,8 @@ export type TmFileKey = keyof typeof TM_FILES;
 export type TmTexts = Record<TmFileKey, string> & {
   /** Optional extra evidence: player_id,club_id,from,to (seasons) — e.g. club appearances. */
   spells?: string;
+  /** Optional club names (club_id,name) for clubs that appear in spells but in no league table. */
+  names?: string;
 };
 
 const TERMINAL = /^(retired|without club|career break|unknown|ban|suspended|\?)$/i;
@@ -284,12 +286,19 @@ export function buildTransfermarktDataset(files: TmTexts, generatedAt: string): 
     events.set(r.player_id!, list);
   }
 
+  for (const r of csvRecords(files.names ?? ''))
+    if (r.club_id && r.name && !nameFromTransfers.has(r.club_id))
+      nameFromTransfers.set(r.club_id, { name: r.name, ms: 0 });
+
   const isTerminal = (id: string) =>
     TERMINAL.test(nameFromTransfers.get(id)?.name ?? clubName.get(id)?.name ?? '');
   const displayName = (id: string) =>
     clubName.get(id)?.name ?? cleanName(nameFromTransfers.get(id)?.name ?? id);
   const isSeniorClub = (id: string) =>
-    !childTeams.has(id) && !isTerminal(id) && !YOUTH.test(displayName(id));
+    !childTeams.has(id) &&
+    !isTerminal(id) &&
+    !YOUTH.test(displayName(id)) &&
+    !/^\d+$/.test(displayName(id)); // a club we only know by number is unusable
 
   const affiliations: Affiliation[] = [];
   const clubUse = new Map<string, number>();
@@ -342,17 +351,19 @@ export function buildTransfermarktDataset(files: TmTexts, generatedAt: string): 
     const from = num(r.from);
     const to = num(r.to);
     if (!profiles.has(r.player_id!) || !isSeniorClub(r.club_id!) || !(to >= from)) continue;
+    const year = r.precision === 'year';
     const spell: Affiliation = {
       playerId: `tmk-p${r.player_id}`,
       teamId: `tmk-c${r.club_id}`,
       fromSeason: from,
       toSeason: to,
-      precision: 'season',
+      precision: year ? 'year' : 'season',
       status: 'confirmed',
       source: 'transfermarkt',
     };
     addAff(spell);
-    clubUse.set(r.club_id!, (clubUse.get(r.club_id!) ?? 0) + 1);
+    // dated evidence about a notable player makes its club notable enough to keep
+    clubUse.set(r.club_id!, (clubUse.get(r.club_id!) ?? 0) + (year ? 5 : 1));
   }
 
   // ---- teams: only clubs that matter (appear in a league table or have enough history) ------------

@@ -16,6 +16,8 @@ const EnvSchema = z.object({
   STALE_AFTER_HOURS: z.coerce.number().min(1).default(72),
   TRANSFERMARKT_CACHE_DIR: z.string().default('.data/transfermarkt-cache'),
   DCARIBOU_DIR: z.string().optional(),
+  DCARIBOU_WIKIDATA: z.enum(['on', 'off']).default('on'),
+  WIKIDATA_CAREERS_CACHE: z.string().default('.data/wikidata-careers.json'),
   TRANSFERMARKT_LOCAL_DIR: z.string().optional(),
   OPENDATA_CACHE_DIR: z.string().default('.data/opendata-cache'),
   STATSBOMB_CACHE_DIR: z.string().default('.data/statsbomb-cache'),

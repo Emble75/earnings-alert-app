@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Dataset } from '../../../shared/football/types';
 import { csvRecords } from '../csv';
 import type { FootballProvider, ProviderContext } from './types';
+import { fetchCareers, type WdSpell } from '../wikidata-careers';
 import { buildTransfermarktDataset, type TmTexts } from './transfermarkt';
 
 /**
@@ -44,7 +45,7 @@ const seasonStart = (s: string) => {
   return a >= 50 ? 1900 + a : 2000 + a;
 };
 
-export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
+export function convertDcaribou(t: DcaribouTexts, now: Date, wd: WdSpell[] = []): TmTexts {
   const tierOf: Record<string, string> = {
     first_tier: 'First Tier',
     second_tier: 'Second Tier',
@@ -129,7 +130,7 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
   }
 
   // consecutive appearance seasons at one club become spells (2012+ careers are complete this way)
-  const spells = ['player_id,club_id,from,to'];
+  const spells = ['player_id,club_id,from,to,precision'];
   for (const [key, set] of played) {
     const [p, c] = key.split('|');
     const ys = [...set].sort((a, b) => a - b);
@@ -137,11 +138,19 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
     let prev = from;
     for (const y of [...ys.slice(1), Infinity]) {
       if (y !== prev + 1) {
-        spells.push(row(p, c, from, prev));
+        spells.push(row(p, c, from, prev, 'season'));
         from = y;
       }
       prev = y;
     }
+  }
+
+  // Wikidata careers (CC0), keyed by Transfermarkt ids: year-precision, club-only evidence
+  const names = ['club_id,name'];
+  for (const [id, nm] of clubName) names.push(row(id, nm));
+  for (const w of wd) {
+    spells.push(row(w.tm, w.club, w.from, w.to, 'year'));
+    if (w.clubName && !clubName.has(w.club)) names.push(row(w.club, w.clubName));
   }
 
   // ---- profiles + values ----
@@ -218,12 +227,17 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
     seasons: seasons.join('\n'),
     children: 'parent_team_id,child_team_id\n',
     spells: spells.join('\n'),
+    names: names.join('\n'),
     values: values.join('\n'),
   };
 }
 
-export function buildDcaribouDataset(t: DcaribouTexts, generatedAt: string): Dataset {
-  const ds = buildTransfermarktDataset(convertDcaribou(t, new Date(generatedAt)), generatedAt);
+export function buildDcaribouDataset(
+  t: DcaribouTexts,
+  generatedAt: string,
+  wd: WdSpell[] = [],
+): Dataset {
+  const ds = buildTransfermarktDataset(convertDcaribou(t, new Date(generatedAt), wd), generatedAt);
   const own = <T extends { source: string }>(xs: T[]): T[] =>
     xs.map((x) => ({ ...x, source: 'dcaribou' }));
   return {
@@ -249,6 +263,8 @@ export function buildDcaribouDataset(t: DcaribouTexts, generatedAt: string): Dat
 export interface DcaribouOptions {
   /** Folder with the extracted Kaggle files (players.csv, transfers.csv, …). */
   dir: string;
+  /** Wikidata (CC0) fills pre-2012 careers; skipped gracefully when unreachable. */
+  wikidata?: { enabled: boolean; cacheFile: string; userAgent: string; fetchImpl?: typeof fetch };
   now?: () => Date;
 }
 
@@ -267,8 +283,20 @@ export function dcaribouProvider(opts: DcaribouOptions): FootballProvider {
           );
         texts[name] = fs.readFileSync(file, 'utf8');
       }
+      let wd: WdSpell[] = [];
+      if (opts.wikidata?.enabled) {
+        // Notable players only: that is who Wikidata knows well and who the games ask for.
+        const ids: string[] = [];
+        for (const r of csvRecords(texts.players)) {
+          const value = Number(r.highest_market_value_in_eur);
+          if (value >= 1_000_000 || Number(r.international_caps) >= 10) ids.push(r.player_id!);
+        }
+        ctx.log.info('dcaribou: fetching careers from Wikidata', { players: ids.length });
+        wd = await fetchCareers(ids, { ...opts.wikidata, log: ctx.log });
+        ctx.log.info('dcaribou: Wikidata career statements', { count: wd.length });
+      }
       ctx.log.info('dcaribou: building dataset');
-      return buildDcaribouDataset(texts, (opts.now ?? (() => new Date()))().toISOString());
+      return buildDcaribouDataset(texts, (opts.now ?? (() => new Date()))().toISOString(), wd);
     },
   };
 }
