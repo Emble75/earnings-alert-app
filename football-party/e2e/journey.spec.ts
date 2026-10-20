@@ -149,7 +149,9 @@ test('football tic-tac-toe: server-validated answers across two devices, with re
   const code = await createRoom(host, 'Xena');
   await joinRoom(guest, code, 'Otto');
   await host.getByRole('radio', { name: /tic-tac-toe/i }).click();
-  await host.getByRole('radio', { name: 'Easy · many answers' }).click();
+  const easy = host.getByRole('radio', { name: 'Easy · many answers' });
+  await easy.evaluate((el) => el.scrollIntoView({ block: 'center' })); // clear of the sticky bar
+  await easy.click();
   await host.getByRole('button', { name: /kick off football tic-tac-toe/i }).click();
   await expect(guest.getByRole('grid')).toBeVisible();
 
@@ -178,7 +180,7 @@ test('football tic-tac-toe: server-validated answers across two devices, with re
   await mover.getByRole('gridcell').first().click();
   const name = await answerFor(mover, 0);
   const search = mover.getByRole('combobox', { name: /search footballers/i });
-  await search.fill(name.slice(0, 4));
+  await search.fill(name);
   await mover.getByRole('option', { name }).click();
   await expect(other.getByRole('gridcell').first()).toHaveAttribute('aria-label', new RegExp(name));
   await expect(other.getByText('Pick a square')).toBeVisible();
@@ -191,10 +193,13 @@ test('football tic-tac-toe: server-validated answers across two devices, with re
   // invalid answer: a footballer who doesn't fit loses the turn
   await other.getByRole('gridcell').nth(4).click();
   const [r4, c4] = (await labelOf(other, 4)).split(' × ');
-  const bad = idx
-    .allPlayers()
-    .find((p) => !idx.verdict(p.id, byLabel(r4!)).ok && !idx.verdict(p.id, byLabel(c4!)).ok)!;
-  await other.getByRole('combobox', { name: /search footballers/i }).fill(bad.name.slice(0, 5));
+  const bad = idx.allPlayers().find(
+    (p) =>
+      p.name !== name && // already claimed footballers are disabled in the picker
+      !idx.verdict(p.id, byLabel(r4!)).ok &&
+      !idx.verdict(p.id, byLabel(c4!)).ok,
+  )!;
+  await other.getByRole('combobox', { name: /search footballers/i }).fill(bad.name);
   await other
     .getByRole('option', { name: new RegExp(bad.name.replace(/[()]/g, '')) })
     .first()

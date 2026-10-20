@@ -115,6 +115,8 @@ describe('HTTP API', () => {
       'tictactoe',
       'linkup',
       'career',
+      'oddone',
+      'whoareya',
     ]);
     const s = await (await fetch(base + '/api/players/search?q=mbappe')).json();
     expect(s.results[0].name).toBe('Kylian Mbappé');
