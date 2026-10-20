@@ -109,51 +109,51 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
       <Link to="/" className="back-link">
         <ArrowLeft size={16} aria-hidden /> Back
       </Link>
-      <div className="eyebrow lime">One phone · pass it around</div>
-      <h1 className="page-title">Party mode</h1>
+      <div className="eyebrow lime">One phone</div>
+      <h1 className="page-title">{initial ? gameMeta[initial].title : 'Party mode'}</h1>
       <p className="lede">
-        Everyone plays on this one phone. Secrets are hidden between hand-overs; clues are said out
-        loud.
+        {initial ? gameMeta[initial].tagline : 'Everyone plays on this one phone. Pick a game.'}
       </p>
 
       <ol className="setup-steps">
-        <li className="card step-card" aria-labelledby="s1">
-          <div className="step-head">
-            <span className="step-no mono">01</span>
-            <h2 id="s1">Pick the game</h2>
-          </div>
-          <div className="game-options" role="radiogroup" aria-labelledby="s1">
-            {gameMetaList.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                role="radio"
-                aria-checked={game === g.id}
-                className={`game-option ${game === g.id ? 'on' : ''}`}
-                onClick={() => {
-                  setGame(g.id);
-                  setSecs(g.id === 'career' ? 30 : isQuick(g.id) ? 15 : 45);
-                }}
-              >
-                <g.icon size={28} aria-hidden />
-                <span className="go-title">{g.title}</span>
-                <span className="go-tag">
-                  {g.id === 'impostor'
-                    ? '3–8 players · find the faker'
-                    : g.id === 'tictactoe'
-                      ? '2–8 players · or vs the computer'
-                      : g.id === 'linkup'
-                        ? '1–8 players · name the link'
-                        : '1–8 players · guess the career'}
-                </span>
-              </button>
-            ))}
-          </div>
-        </li>
-
+        {!initial && (
+          <li className="card step-card" aria-labelledby="s1">
+            <div className="step-head">
+              <span className="step-no mono">01</span>
+              <h2 id="s1">Pick the game</h2>
+            </div>
+            <div className="game-options" role="radiogroup" aria-labelledby="s1">
+              {gameMetaList.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={game === g.id}
+                  className={`game-option ${game === g.id ? 'on' : ''}`}
+                  onClick={() => {
+                    setGame(g.id);
+                    setSecs(g.id === 'career' ? 30 : isQuick(g.id) ? 15 : 45);
+                  }}
+                >
+                  <g.icon size={28} aria-hidden />
+                  <span className="go-title">{g.title}</span>
+                  <span className="go-tag">
+                    {g.id === 'impostor'
+                      ? '3–8 players · find the faker'
+                      : g.id === 'tictactoe'
+                        ? '2–8 players · or vs the computer'
+                        : g.id === 'linkup'
+                          ? '1–8 players · name the link'
+                          : '1–8 players · guess the career'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </li>
+        )}
         <li className="card step-card" aria-labelledby="s2">
           <div className="step-head">
-            <span className="step-no mono">02</span>
+            <span className="step-no mono">{initial ? '01' : '02'}</span>
             <h2 id="s2">Who’s playing?</h2>
           </div>
           {game === 'tictactoe' && (
@@ -227,7 +227,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
 
         <li className="card step-card" aria-labelledby="s3">
           <div className="step-head">
-            <span className="step-no mono">03</span>
+            <span className="step-no mono">{initial ? '02' : '03'}</span>
             <h2 id="s3">Settings</h2>
           </div>
           {game === 'tictactoe' || isQuick(game) ? (
