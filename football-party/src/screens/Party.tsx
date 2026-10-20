@@ -10,7 +10,13 @@ import { CenterMessage, Page } from './Shell';
 import { RoomFrame } from './RoomFrame';
 import { store } from '@/lib/storage';
 
-const LIMITS = { tictactoe: { min: 2, max: 8 }, impostor: { min: 3, max: 8 } } as const;
+const LIMITS = {
+  tictactoe: { min: 2, max: 8 },
+  impostor: { min: 3, max: 8 },
+  linkup: { min: 1, max: 8 },
+  career: { min: 1, max: 8 },
+} as const;
+const isQuick = (g: GameId) => g === 'linkup' || g === 'career';
 const NAMES_KEY = 'pitchside.party.names';
 
 /** One-phone party mode: set up, then pass the device around. Same engine as online rooms, in the browser. */
@@ -20,7 +26,11 @@ export function Party() {
   if (!setup)
     return (
       <PartySetup
-        initial={game === 'tictactoe' || game === 'impostor' ? game : undefined}
+        initial={
+          game === 'tictactoe' || game === 'impostor' || game === 'linkup' || game === 'career'
+            ? game
+            : undefined
+        }
         onStart={setSetup}
       />
     );
@@ -39,6 +49,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
   const [discSecs, setDiscSecs] = useState(180);
   const [timersOn, setTimersOn] = useState(true);
   const [secs, setSecs] = useState(45);
+  const [quickRounds, setQuickRounds] = useState(10);
   const hint = 'position' as const; // the impostor gets a position hint
   const setName = (i: number, v: string) => setNames((n) => n.map((x, j) => (j === i ? v : x)));
 
@@ -61,9 +72,21 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
         names: clean,
         config: { difficulty, rounds, timers: timersOn, turnSeconds: secs },
       });
+    else if (isQuick(game))
+      onStart({
+        game: game as 'linkup' | 'career',
+        names: clean,
+        config: {
+          difficulty,
+          rounds: quickRounds,
+          timers: timersOn,
+          seconds: secs,
+          spoken: true,
+        },
+      });
     else
       onStart({
-        game,
+        game: 'impostor',
         names: clean,
         config: {
           rounds: 99, // endless: "Next round" until you stop
@@ -107,14 +130,21 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
                 role="radio"
                 aria-checked={game === g.id}
                 className={`game-option ${game === g.id ? 'on' : ''}`}
-                onClick={() => setGame(g.id)}
+                onClick={() => {
+                  setGame(g.id);
+                  setSecs(g.id === 'career' ? 30 : isQuick(g.id) ? 15 : 45);
+                }}
               >
                 <g.icon size={28} aria-hidden />
                 <span className="go-title">{g.title}</span>
                 <span className="go-tag">
                   {g.id === 'impostor'
                     ? '3–8 players · find the faker'
-                    : '2–8 players · or vs the computer'}
+                    : g.id === 'tictactoe'
+                      ? '2–8 players · or vs the computer'
+                      : g.id === 'linkup'
+                        ? '1–8 players · name the link'
+                        : '1–8 players · guess the career'}
                 </span>
               </button>
             ))}
@@ -200,7 +230,7 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
             <span className="step-no mono">03</span>
             <h2 id="s3">Settings</h2>
           </div>
-          {game === 'tictactoe' ? (
+          {game === 'tictactoe' || isQuick(game) ? (
             <div className="config-grid">
               <div className="span-2">
                 <Segmented
@@ -215,16 +245,29 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
                 />
               </div>
               <div className="span-2">
-                <Segmented
-                  label="Rounds"
-                  value={rounds}
-                  onChange={setRounds}
-                  options={[
-                    { value: 1, label: 'Single' },
-                    { value: 3, label: 'Best of 3' },
-                    { value: 5, label: 'Best of 5' },
-                  ]}
-                />
+                {isQuick(game) ? (
+                  <Segmented
+                    label="Rounds"
+                    value={quickRounds}
+                    onChange={setQuickRounds}
+                    options={[
+                      { value: 5, label: '5' },
+                      { value: 10, label: '10' },
+                      { value: 15, label: '15' },
+                    ]}
+                  />
+                ) : (
+                  <Segmented
+                    label="Rounds"
+                    value={rounds}
+                    onChange={setRounds}
+                    options={[
+                      { value: 1, label: 'Single' },
+                      { value: 3, label: 'Best of 3' },
+                      { value: 5, label: 'Best of 5' },
+                    ]}
+                  />
+                )}
               </div>
             </div>
           ) : null}
@@ -242,9 +285,9 @@ function PartySetup({ initial, onStart }: { initial?: GameId; onStart: (s: Local
             </div>
             {timersOn && (
               <div className="span-2">
-                {game === 'tictactoe' ? (
+                {game === 'tictactoe' || isQuick(game) ? (
                   <Stepper
-                    label="Seconds per turn"
+                    label={isQuick(game) ? 'Seconds per round' : 'Seconds per turn'}
                     value={secs}
                     min={10}
                     max={180}

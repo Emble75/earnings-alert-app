@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { Grid3x3, VenetianMask } from 'lucide-react';
+import { Grid3x3, Link2, Route, VenetianMask } from 'lucide-react';
 import type { GameId } from '@shared/games/types';
 
 /** Static, dependency-light game descriptions (safe for the landing page bundle). */
@@ -49,6 +49,39 @@ export const gameMeta: Record<GameId, GameMeta> = {
       'A footballer can be used once per round. Three in a line wins the round.',
       'Only confirmed records count. League squares need dated club spells that overlap the club’s time in that league.',
       'Scoring: +1 per claimed square, +3 for each member of the winning side, +1 each for a draw.',
+    ],
+  },
+  linkup: {
+    id: 'linkup',
+    title: 'Link-Up',
+    kicker: 'Quick fire',
+    tagline: 'Two badges. Name a footballer who played for both.',
+    blurb:
+      'Two clubs, nations or leagues appear. Be the first to name a footballer who fits both — shout it out in person, or search and submit online.',
+    players: '1–12 players',
+    length: '3–8 min',
+    icon: Link2,
+    rules: [
+      'Two badges appear. Name any footballer who played for both.',
+      'In person: say it out loud, the host taps who got it. Online: search a footballer — the first correct answer wins the round.',
+      'Online you get 3 wrong guesses per round.',
+      'Every answer is checked against confirmed records.',
+    ],
+  },
+  career: {
+    id: 'career',
+    title: 'Career Path',
+    kicker: 'Quick fire',
+    tagline: 'The clubs, in order. Who is it?',
+    blurb:
+      'A famous footballer’s clubs appear, oldest first. Guess who it is before anyone else does.',
+    players: '1–12 players',
+    length: '3–8 min',
+    icon: Route,
+    rules: [
+      'You see the clubs a famous footballer played for, oldest first.',
+      'In person: shout your guess, the host reveals and taps who got it. Online: search and submit — first correct wins.',
+      'Only well-known footballers are used.',
     ],
   },
 };

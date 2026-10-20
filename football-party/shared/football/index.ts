@@ -332,18 +332,10 @@ export class FootballIndex {
     return out;
   }
 
-  /**
-   * Builds a 3x3 grid where every one of the 9 cells has at least the difficulty's minimum number
-   * of validated answers. Easier grids prefer well-known criteria (those with many well-known
-   * players) so the board feels fair; if the data can't support that, it relaxes to any verifiable
-   * criteria. Returns null if even that is impossible: the game is then unplayable, never guessed.
-   */
-  generateGrid(rng: Rng, difficulty: Difficulty): GridSpec | null {
-    // Each level fixes WHICH criteria may appear (so Easy = famous leagues/clubs/nations only) and
-    // how many well-known players each cell needs. Levels fall back to the next looser one only when
-    // a (thin) dataset cannot support the strict one, so a grid is always verified.
+  /** Which criteria may appear at each level, and the answer floors (shared by grids and pairs). */
+  private levels(): Record<string, Level> {
     const medClub = (c: Criterion) => isProminentClub(c.label) || isEasyClub(c.label);
-    const levels: Record<string, Level> = {
+    return {
       easy: {
         allowed: (c) =>
           c.type === 'league'
@@ -383,6 +375,19 @@ export class FootballIndex {
       any3: { allowed: () => true, minAnswers: 3, famousPerCell: 0, minMembers: 2 },
       any2: { allowed: () => true, minAnswers: 2, famousPerCell: 0, minMembers: 2 },
     };
+  }
+
+  /**
+   * Builds a 3x3 grid where every one of the 9 cells has at least the difficulty's minimum number
+   * of validated answers. Easier grids prefer well-known criteria (those with many well-known
+   * players) so the board feels fair; if the data can't support that, it relaxes to any verifiable
+   * criteria. Returns null if even that is impossible: the game is then unplayable, never guessed.
+   */
+  generateGrid(rng: Rng, difficulty: Difficulty): GridSpec | null {
+    // Each level fixes WHICH criteria may appear (so Easy = famous leagues/clubs/nations only) and
+    // how many well-known players each cell needs. Levels fall back to the next looser one only when
+    // a (thin) dataset cannot support the strict one, so a grid is always verified.
+    const levels = this.levels();
     const order =
       difficulty === 'easy'
         ? ['easy', 'any3', 'medium', 'any2', 'any']
@@ -427,6 +432,63 @@ export class FootballIndex {
       }
     }
     return null;
+  }
+
+  /**
+   * Two criteria with plenty of famous shared players, for the quick games ("name a footballer who
+   * played for both"). `avoid` holds pair keys already used this game.
+   */
+  generatePair(
+    rng: Rng,
+    difficulty: Difficulty,
+    avoid: ReadonlySet<string> = new Set(),
+  ): { a: Criterion; b: Criterion; answers: string[] } | null {
+    const levels = this.levels();
+    const floors = { easy: [5, 3], medium: [3, 2], hard: [1, 0] } as const;
+    const order =
+      difficulty === 'easy'
+        ? ['easy', 'medium', 'hard', 'any']
+        : difficulty === 'medium'
+          ? ['medium', 'hard', 'any']
+          : ['hard', 'any'];
+    for (const name of order) {
+      const lv = levels[name]!;
+      const [minA, minF] = name in floors ? floors[name as keyof typeof floors] : [1, 0];
+      const pool = this.criteriaPool(0, false, lv.minMembers).filter((c) =>
+        lv.allowed(c, this.playersFor(c).size),
+      );
+      if (pool.length < 2) continue;
+      const famous = (ids: string[]) =>
+        ids.filter((id) => (this.players.get(id)?.tier ?? 3) <= 2).length;
+      for (const a of shuffle(pool, rng).slice(0, 60)) {
+        for (const b of shuffle(pool, rng).slice(0, 80)) {
+          if (a === b || (a.type === b.type && a.type !== 'club') || this.isTrivialPair(a, b))
+            continue;
+          if (avoid.has(`${a.type}:${a.id}|${b.type}:${b.id}`)) continue;
+          if (avoid.has(`${b.type}:${b.id}|${a.type}:${a.id}`)) continue;
+          const answers = this.validAnswers(a, b);
+          if (answers.length >= minA && famous(answers) >= minF) return { a, b, answers };
+        }
+      }
+    }
+    return null;
+  }
+
+  /** Clubs a player is known to have played for, oldest first (one entry per club). */
+  careerOf(playerId: string): Criterion[] {
+    const seen = new Set<string>();
+    const out: Criterion[] = [];
+    const affs = this.affiliationsOf(playerId)
+      .filter((a) => a.status === 'confirmed')
+      .sort((x, y) => (x.fromSeason ?? 0) - (y.fromSeason ?? 0));
+    for (const a of affs) {
+      const t = this.teams.get(a.teamId);
+      if (!t || t.kind !== 'club' || seen.has(t.id)) continue;
+      seen.add(t.id);
+      const c = this.criterionFor('club', t.id);
+      if (c) out.push(c);
+    }
+    return out;
   }
 
   private isTrivialPair(a: Criterion, b: Criterion) {

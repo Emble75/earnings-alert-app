@@ -110,7 +110,12 @@ describe('HTTP API', () => {
     const meta = await (await fetch(base + '/api/meta')).json();
     expect(meta.data.isSample).toBe(true);
     expect(meta.data.kind).toBe('sample');
-    expect(meta.games.map((g: { id: string }) => g.id)).toEqual(['impostor', 'tictactoe']);
+    expect(meta.games.map((g: { id: string }) => g.id)).toEqual([
+      'impostor',
+      'tictactoe',
+      'linkup',
+      'career',
+    ]);
     const s = await (await fetch(base + '/api/players/search?q=mbappe')).json();
     expect(s.results[0].name).toBe('Kylian Mbappé');
     expect((await (await fetch(base + '/api/players/search?q=zzzzzz')).json()).results).toEqual([]);

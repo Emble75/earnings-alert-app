@@ -8,6 +8,8 @@ import { Segmented, Stepper } from '@/ui/kit';
 import { gameMeta, type GameMeta } from './meta';
 import { ImpostorScreen } from './impostor/ImpostorScreen';
 import { TicTacToeScreen } from './tictactoe/TicTacToeScreen';
+import { QuickScreen } from './quick/QuickScreen';
+import type { QuickConfig } from '@shared/games/quick';
 
 export interface ConfigProps<C> {
   config: C;
@@ -204,6 +206,58 @@ function TttConfigPanel({ config, onChange, disabled }: ConfigProps<TttConfig>) 
   );
 }
 
+function QuickConfigPanel({ config, onChange, disabled }: ConfigProps<QuickConfig>) {
+  return (
+    <div className="config-grid">
+      <div className="span-2">
+        <Segmented
+          label="Difficulty"
+          value={config.difficulty}
+          disabled={disabled}
+          onChange={(v) => onChange({ difficulty: v })}
+          options={[
+            { value: 'easy', label: 'Easy' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'hard', label: 'Hard' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Rounds"
+          value={config.rounds}
+          disabled={disabled}
+          onChange={(v) => onChange({ rounds: v })}
+          options={[
+            { value: 5, label: '5' },
+            { value: 10, label: '10' },
+            { value: 15, label: '15' },
+          ]}
+        />
+      </div>
+      <div className="span-2">
+        <Segmented
+          label="Time per round"
+          value={!config.timers ? 'off' : config.seconds}
+          disabled={disabled}
+          onChange={(v) =>
+            v === 'off'
+              ? onChange({ timers: false })
+              : onChange({ timers: true, seconds: Number(v) })
+          }
+          options={[
+            { value: 'off', label: 'Off' },
+            { value: 10, label: '10s' },
+            { value: 20, label: '20s' },
+            { value: 30, label: '30s' },
+            { value: 60, label: '60s' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
 export const clientGames: Record<GameId, ClientGame> = {
   impostor: {
     ...gameMeta.impostor,
@@ -215,6 +269,8 @@ export const clientGames: Record<GameId, ClientGame> = {
     Screen: TicTacToeScreen,
     Config: TttConfigPanel,
   },
+  linkup: { ...gameMeta.linkup, Screen: QuickScreen, Config: QuickConfigPanel },
+  career: { ...gameMeta.career, Screen: QuickScreen, Config: QuickConfigPanel },
 };
 
 export const clientGameList = Object.values(clientGames);

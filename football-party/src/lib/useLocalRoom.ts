@@ -52,7 +52,7 @@ export type LocalSetup =
       names: string[];
       config: Record<string, unknown>;
     }
-  | { game: 'impostor'; names: string[]; config: Record<string, unknown> };
+  | { game: 'impostor' | 'linkup' | 'career'; names: string[]; config: Record<string, unknown> };
 
 export interface LocalRoom {
   controller: RoomController | null;
@@ -77,6 +77,7 @@ function actingPlayer(room: Room, setup: LocalSetup): string {
       ? s.teams[side as 0 | 1][Math.floor(s.turn / 2) % s.teams[side as 0 | 1].length]!
       : hostId;
   }
+  if (setup.game === 'linkup' || setup.game === 'career') return hostId; // all actions are the host's
   const s = game.state as ImpostorState;
   if (s.phase === 'reveal') return s.participants.find((p) => !s.ready.includes(p)) ?? hostId;
   if (s.phase === 'clues') return s.turnOrder[s.turnIndex] ?? hostId;

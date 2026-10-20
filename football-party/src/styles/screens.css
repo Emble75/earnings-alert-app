@@ -1670,3 +1670,188 @@ select.input {
   text-transform: uppercase;
   color: var(--muted);
 }
+
+/* ---- Home (clean overview) ---- */
+.home-hero {
+  position: relative;
+  padding: var(--s-7) 0 var(--s-6);
+  isolation: isolate;
+}
+.home-hero .pitch-lines {
+  inset: -2rem calc(var(--gutter) * -1) 0;
+  opacity: 0.09;
+  z-index: -1;
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+.home-title {
+  font-size: var(--fs-3xl);
+  line-height: 0.92;
+  font-weight: 900;
+  margin: var(--s-4) 0 var(--s-4);
+}
+.home-title .hl {
+  background: var(--lime);
+  color: var(--ink-950);
+  padding: 0 0.1em 0.04em;
+  display: inline-block;
+  transform: rotate(-1.2deg);
+}
+.home-section {
+  margin-top: var(--s-7);
+}
+.home-h {
+  font-size: var(--fs-lg);
+  margin-bottom: var(--s-4);
+  color: var(--chalk-dim);
+  font-weight: 700;
+}
+.games-grid,
+.modes-grid {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+.modes-grid {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+.game-card {
+  display: grid;
+  gap: var(--s-2);
+  align-content: start;
+}
+.game-card h3 {
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+.game-card p {
+  color: var(--chalk-dim);
+}
+.game-card-cta {
+  margin-top: var(--s-3);
+}
+.mode-card {
+  display: grid;
+  gap: var(--s-2);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.mode-card:hover {
+  border-color: var(--lime);
+  transform: translateY(-2px);
+}
+.mode-card h3 {
+  font-size: var(--fs-xl);
+}
+.mode-card p {
+  color: var(--chalk-dim);
+}
+.mode-go {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--lime);
+  font-weight: 700;
+}
+.home-note {
+  margin-top: var(--s-7);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  max-width: 40rem;
+}
+.home-note a {
+  color: var(--chalk-dim);
+  text-decoration: underline;
+}
+
+/* ---- Quick games (Link-Up, Career Path) ---- */
+.qcard {
+  display: grid;
+  gap: var(--s-4);
+  justify-items: center;
+  text-align: center;
+}
+.qquestion {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.05;
+}
+.qprompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+.qprompt.trail {
+  gap: var(--s-2);
+}
+.qstep {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.qbadge {
+  display: grid;
+  justify-items: center;
+  gap: var(--s-2);
+  max-width: 7.5rem;
+}
+.qbadge-label {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  line-height: 1.1;
+}
+.qx,
+.qarrow {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  color: var(--lime);
+}
+.qsay {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 900;
+  color: var(--lime);
+}
+.qreveal {
+  display: grid;
+  gap: var(--s-3);
+  justify-items: center;
+}
+.qanswers {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--s-1);
+  font-size: var(--fs-lg);
+  font-weight: 800;
+}
+
+/* Always keep content off the screen edge on phones. */
+main#main.container,
+.site-footer .container {
+  padding-inline: max(var(--gutter), 1rem);
+}
+
+/* Never let long game titles push the lobby wider than the phone. */
+.game-options,
+.game-option,
+.picker-games,
+.roster,
+.invite {
+  min-width: 0;
+  max-width: 100%;
+}
+.game-option .go-title,
+.game-option .go-tag {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 40rem) {
+  .game-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

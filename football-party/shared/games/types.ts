@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { FootballIndex } from '../football';
 import type { Rng } from '../util/rng';
 
-export type GameId = 'impostor' | 'tictactoe';
+export type GameId = 'impostor' | 'tictactoe' | 'linkup' | 'career';
 
 /** Expected, user-facing rule violation. `code` is stable for clients, `message` is displayable. */
 export class GameError extends Error {

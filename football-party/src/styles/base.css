@@ -157,3 +157,8 @@ button {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
 }
+
+/* Keep focused/scrolled controls clear of the sticky header and the sticky start bar. */
+html {
+  scroll-padding-block: 5rem 7rem;
+}

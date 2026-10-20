@@ -45,9 +45,12 @@ async function joinRoom(page: Page, code: string, name: string) {
 
 test('landing explains the product and links into play', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(/faker/i);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/pick a game/i);
   await expect(page.getByText(/sample/i).first()).toBeVisible();
-  await page.getByRole('link', { name: /start a room/i }).click();
+  await page
+    .getByRole('link', { name: /online/i })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/play/);
 });
 
@@ -327,4 +330,32 @@ test('installable PWA metadata is served', async ({ request }) => {
   expect(m.display).toBe('standalone');
   expect((await request.get('/icons/icon-512.png')).ok()).toBe(true);
   expect((await request.get('/sw.js')).ok()).toBe(true);
+});
+
+test('home lists four games with one-phone and online entries', async ({ page }) => {
+  await page.goto('/');
+  for (const t of ['Football Impostor', 'Football Tic-Tac-Toe', 'Link-Up', 'Career Path'])
+    await expect(page.getByRole('heading', { name: t })).toBeVisible();
+  await page
+    .getByRole('article')
+    .filter({ hasText: 'Link-Up' })
+    .getByRole('link', { name: 'One phone' })
+    .click();
+  await expect(page).toHaveURL(/\/party\/linkup/);
+});
+
+test('one-phone Link-Up: reveal the answer, then the host awards the point', async ({ page }) => {
+  await page.goto('/party/linkup');
+  await page.getByRole('button', { name: /kick off/i }).click();
+  await expect(page.getByText(/say it out loud/i)).toBeVisible();
+  await page.getByRole('button', { name: /reveal answer/i }).click();
+  await expect(page.getByText(/who got it/i)).toBeVisible();
+  await page.getByRole('button', { name: 'Player 1', exact: true }).click();
+  await expect(page.getByText(/round 2\//i)).toBeVisible();
+});
+
+test('one-phone Career Path shows a club trail', async ({ page }) => {
+  await page.goto('/party/career');
+  await page.getByRole('button', { name: /kick off/i }).click();
+  await expect(page.getByLabel(/career, oldest club first/i)).toBeVisible();
 });

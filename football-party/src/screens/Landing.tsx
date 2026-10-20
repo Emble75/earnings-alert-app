@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Link2, Smartphone, UserRoundX } from 'lucide-react';
+import { ArrowRight, Hand, Wifi } from 'lucide-react';
 import { gameMetaList } from '@/games/meta';
 import { LinkButton, PitchLines } from '@/ui/kit';
 import { Page } from './Shell';
@@ -7,164 +7,76 @@ import { Page } from './Shell';
 export function Landing() {
   return (
     <Page>
-      <section className="hero">
+      <section className="home-hero">
         <PitchLines variant="half" />
-        <div className="hero-inner">
-          <div className="eyebrow lime">Football party games · No accounts · Play from a link</div>
-          <h1 className="hero-title">
-            <span>Find the</span>
-            <span className="hl">faker.</span>
-            <span className="outline">Name the</span>
-            <span>player.</span>
-          </h1>
-          <p className="hero-sub">
-            Make a room, share the code, and settle the group-chat arguments properly. Two football
-            games built for phones, with every answer checked against real records — not vibes.
-          </p>
-          <div className="row wrap hero-cta">
-            <LinkButton to="/play" size="lg">
-              Start a room <ArrowRight aria-hidden />
-            </LinkButton>
-            <LinkButton to="/party" size="lg" variant="secondary">
-              One phone, pass it around
-            </LinkButton>
-          </div>
-        </div>
-        <HeroCards />
+        <div className="eyebrow lime">Football party games · No accounts</div>
+        <h1 className="home-title">
+          Pick a game.
+          <br />
+          <span className="hl">Beat your friends.</span>
+        </h1>
+        <p className="hero-sub">
+          Quick football games for one phone or the whole group chat. Every answer is checked
+          against real records.
+        </p>
       </section>
 
-      <section className="fixtures" aria-labelledby="fixtures-h">
-        <div className="section-head">
-          <div className="eyebrow">Today’s fixtures</div>
-          <h2 id="fixtures-h">Two games. One group chat.</h2>
-        </div>
-        {gameMetaList.map((g, i) => (
-          <article key={g.id} className={`fixture ${i % 2 ? 'flip' : ''}`}>
-            <div className="fixture-num mono" aria-hidden>
-              0{i + 1}
-            </div>
-            <div className="fixture-copy">
-              <div className="eyebrow lime">{g.kicker}</div>
+      <section className="home-section" aria-labelledby="games-h">
+        <h2 id="games-h" className="home-h">
+          1 · The games
+        </h2>
+        <div className="games-grid">
+          {gameMetaList.map((g) => (
+            <article key={g.id} className="card game-card">
+              <g.icon size={32} aria-hidden />
+              <div className="eyebrow">{g.kicker}</div>
               <h3>{g.title}</h3>
-              <p>{g.blurb}</p>
-              <div className="row wrap" style={{ marginTop: 'var(--s-4)' }}>
+              <p>{g.tagline}</p>
+              <div className="row wrap">
                 <span className="chip">{g.players}</span>
                 <span className="chip">{g.length}</span>
               </div>
-              <div className="row wrap" style={{ marginTop: 'var(--s-5)' }}>
-                <LinkButton to="/play" size="sm">
-                  Play with friends
+              <div className="row wrap game-card-cta">
+                <LinkButton to={`/party/${g.id}`} size="sm">
+                  One phone
                 </LinkButton>
-                <LinkButton to={`/party/${g.id}`} size="sm" variant="secondary">
-                  Play on one phone
+                <LinkButton to="/play" size="sm" variant="secondary">
+                  Online
                 </LinkButton>
               </div>
-            </div>
-            <div className="fixture-art" aria-hidden>
-              {g.id === 'impostor' ? <ImpostorArt /> : <GridArt />}
-            </div>
-          </article>
-        ))}
-      </section>
-
-      <section className="steps" aria-labelledby="steps-h">
-        <div className="section-head">
-          <div className="eyebrow">Kick-off in 30 seconds</div>
-          <h2 id="steps-h">How it works</h2>
-        </div>
-        <ol className="step-list">
-          <li>
-            <Smartphone aria-hidden size={28} />
-            <h3>Make a room</h3>
-            <p>
-              Everyone on their own phone: pick a nickname, get a five-letter code. Or just pass one
-              phone around.
-            </p>
-          </li>
-          <li>
-            <Link2 aria-hidden size={28} />
-            <h3>Share the link</h3>
-            <p>Friends join from any phone or laptop. No download, no sign-up.</p>
-          </li>
-          <li>
-            <UserRoundX aria-hidden size={28} />
-            <h3>Play &amp; rematch</h3>
-            <p>Server-timed rounds, live scores, and one tap to run it back.</p>
-          </li>
-        </ol>
-      </section>
-
-      <section className="honesty card paper" aria-labelledby="honest-h">
-        <div className="eyebrow">Straight talk about the data</div>
-        <h2 id="honest-h">Every answer is checked. Some answers aren’t knowable yet.</h2>
-        <p>
-          Tic-Tac-Toe validates players against dated club, national-team and league records. If our
-          data can’t prove a fact, the game treats it as unknown and never uses it. The built-in set
-          is a small hand-curated <strong>sample</strong>, clearly labelled — not a live or complete
-          database.
-        </p>
-        <Link
-          to="/data"
-          className="btn paper sm"
-          style={{ marginTop: 'var(--s-4)', width: 'fit-content' }}
-        >
-          How data works <ArrowRight aria-hidden size={18} />
-        </Link>
-      </section>
-    </Page>
-  );
-}
-
-function HeroCards() {
-  return (
-    <div className="hero-cards" aria-hidden>
-      <div className="hc hc-a">
-        <div className="eyebrow">Your secret</div>
-        <div className="hc-big">Impostor</div>
-        <div className="hc-line">“Plays as a forward.”</div>
-      </div>
-      <div className="hc hc-b">
-        <div className="mini-board">
-          {['ARS', 'BRA', 'PL', 'MUN', '', '', '', 'X', ''].map((t, i) => (
-            <span key={i} className={t === 'X' ? 'x' : ''}>
-              {t}
-            </span>
+            </article>
           ))}
         </div>
-      </div>
-      <div className="hc hc-c mono">02:14</div>
-    </div>
-  );
-}
+      </section>
 
-function ImpostorArt() {
-  return (
-    <div className="art-impostor">
-      <div className="art-card a1">
-        <span className="eyebrow">Crew</span>
-        <b>???</b>
-      </div>
-      <div className="art-card a2">
-        <span className="eyebrow">Crew</span>
-        <b>???</b>
-      </div>
-      <div className="art-card a3">
-        <span className="eyebrow" style={{ color: 'var(--card-red)' }}>
-          Impostor
-        </span>
-        <b>—</b>
-      </div>
-    </div>
-  );
-}
-function GridArt() {
-  return (
-    <div className="art-grid">
-      {Array.from({ length: 9 }, (_, i) => (
-        <span key={i} className={[0, 4, 8].includes(i) ? 'on' : ''}>
-          {[0, 8].includes(i) ? 'X' : i === 4 ? 'X' : i === 2 ? 'O' : i === 6 ? 'O' : ''}
-        </span>
-      ))}
-    </div>
+      <section className="home-section" aria-labelledby="modes-h">
+        <h2 id="modes-h" className="home-h">
+          2 · How you play
+        </h2>
+        <div className="modes-grid">
+          <Link to="/party" className="card mode-card">
+            <Hand size={36} aria-hidden />
+            <h3>One phone</h3>
+            <p>Everyone around one phone. Nothing to set up, no hand-overs.</p>
+            <span className="mode-go">
+              Start <ArrowRight size={18} aria-hidden />
+            </span>
+          </Link>
+          <Link to="/play" className="card mode-card">
+            <Wifi size={36} aria-hidden />
+            <h3>Online</h3>
+            <p>Everyone on their own phone. Share a 5-letter room code.</p>
+            <span className="mode-go">
+              Create or join <ArrowRight size={18} aria-hidden />
+            </span>
+          </Link>
+        </div>
+      </section>
+
+      <p className="home-note">
+        Only confirmed records count — if the data can’t prove it, the game never guesses. The
+        built-in set is a small <strong>sample</strong>. <Link to="/data">How the data works</Link>
+      </p>
+    </Page>
   );
 }

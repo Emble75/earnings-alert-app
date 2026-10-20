@@ -28,7 +28,10 @@ export function makeRoom(names: string[], env = makeEnv()): Room {
 }
 
 export const cmd = {
-  select: (gameId: 'impostor' | 'tictactoe'): Command => ({ type: 'game.select', gameId }),
+  select: (gameId: 'impostor' | 'tictactoe' | 'linkup' | 'career'): Command => ({
+    type: 'game.select',
+    gameId,
+  }),
   config: (config: Record<string, unknown>): Command => ({ type: 'game.config', config }),
   start: (): Command => ({ type: 'game.start' }),
   act: (action: unknown): Command => ({ type: 'game.action', action }),
