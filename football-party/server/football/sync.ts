@@ -218,7 +218,22 @@ export class FootballService {
         await saveDataset(q, sampleDataset);
       }
     });
-    let ds = await loadDataset(this.db, this.provider.sourceId);
+    let source = this.provider.sourceId;
+    if (source === 'sample') {
+      // No provider chosen: use the biggest real dataset already synced instead of the tiny demo set,
+      // so `npm run dev` after a sync just works.
+      const rows = await this.db.query<{ source_id: string; n: string }>(
+        `SELECT source_id, count(*) AS n FROM players WHERE source_id <> 'sample' GROUP BY source_id`,
+      );
+      const best = rows.rows
+        .map((r) => ({ id: r.source_id, n: Number(r.n) }))
+        .sort((a, b) => b.n - a.n)[0];
+      if (best && best.n >= 1000) {
+        source = best.id;
+        this.log.info('using the largest synced dataset', { source, players: best.n });
+      }
+    }
+    let ds = await loadDataset(this.db, source);
     const empty = !ds || ds.players.length === 0;
     if (empty) {
       // Never leave games without data, but never pass sample data off as the live source either.
