@@ -15,6 +15,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
 COPY db ./db
 COPY data ./data
+# the app writes its embedded database and caches here; it runs as the unprivileged `node` user
+RUN mkdir -p /app/.data && chown -R node:node /app/.data
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
