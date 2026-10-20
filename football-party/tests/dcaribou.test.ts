@@ -60,3 +60,32 @@ describe('dcaribou provider (fixture)', () => {
     );
   });
 });
+
+describe('dcaribou provider (database sync)', () => {
+  it('stores the dataset under its own source id', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { openDb } = await import('../server/db');
+    const { migrate } = await import('../server/db/migrate');
+    const { loadConfig } = await import('../server/config');
+    const { createLogger } = await import('../server/log');
+    const { FootballService } = await import('../server/football/sync');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dcaribou-'));
+    for (const [k, v] of Object.entries(t)) fs.writeFileSync(path.join(dir, `${k}.csv`), v);
+    const log = createLogger('error');
+    const config = loadConfig({
+      FOOTBALL_PROVIDER: 'dcaribou',
+      DCARIBOU_DIR: dir,
+      DB_MODE: 'memory',
+    } as never);
+    const db = await openDb(config, log);
+    await migrate(db, log);
+    const svc = new FootballService(db, config, log);
+    await svc.init();
+    const run = await svc.sync('cli');
+    expect(run.error).toBeNull();
+    expect(run.status).toBe('success');
+    await db.close();
+  });
+});

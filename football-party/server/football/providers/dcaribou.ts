@@ -198,10 +198,18 @@ export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
 
 export function buildDcaribouDataset(t: DcaribouTexts, generatedAt: string): Dataset {
   const ds = buildTransfermarktDataset(convertDcaribou(t, new Date(generatedAt)), generatedAt);
+  const own = <T extends { source: string }>(xs: T[]): T[] =>
+    xs.map((x) => ({ ...x, source: 'dcaribou' }));
   return {
     ...ds,
+    teams: own(ds.teams),
+    competitions: own(ds.competitions),
+    memberships: own(ds.memberships),
+    affiliations: own(ds.affiliations),
+    players: ds.players.map((p) => ({ ...p, source: 'dcaribou' })),
     meta: {
       ...ds.meta,
+      sourceId: 'dcaribou',
       label: 'Transfermarkt player-scores (dcaribou)',
       license:
         'CC0 1.0 (dcaribou/transfermarkt-datasets). The data was scraped from Transfermarkt; its terms of use are a residual risk for commercial publication.',
