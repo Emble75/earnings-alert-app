@@ -1,0 +1,240 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Dataset } from '../../../shared/football/types';
+import { csvRecords } from '../csv';
+import type { FootballProvider, ProviderContext } from './types';
+import { buildTransfermarktDataset, type TmTexts } from './transfermarkt';
+
+/**
+ * dcaribou/transfermarkt-datasets ("player-scores" on Kaggle, CC0). Its tables are converted into the
+ * shape the Transfermarkt builder already understands, so both sources share one career/league logic:
+ *  - transfers.csv           → transfer history (future-dated contract end rows are re-dated by season)
+ *  - games.csv + clubs.csv   → per-season league tables (club ∈ domestic league in that season)
+ *  - appearances.csv         → national-team caps (appearances for a national_teams id)
+ *  - players.csv             → profiles + market-value popularity (highest value)
+ */
+export const DCARIBOU_FILES = [
+  'players',
+  'transfers',
+  'clubs',
+  'competitions',
+  'games',
+  'appearances',
+  'national_teams',
+] as const;
+export type DcaribouTexts = Record<(typeof DCARIBOU_FILES)[number], string>;
+
+const q = (s: string | undefined) => `"${(s ?? '').replace(/"/g, '""')}"`;
+const row = (...cols: (string | number | undefined)[]) =>
+  cols.map((c) => q(String(c ?? ''))).join(',');
+
+const need = (table: string, r: Record<string, string>, cols: string[]) => {
+  const missing = cols.filter((c) => !(c in r));
+  if (missing.length)
+    throw new Error(
+      `${table}.csv: missing columns ${missing.join(', ')} (have: ${Object.keys(r).join(', ')})`,
+    );
+};
+
+/** "25/26" → 2025; "99/00" → 1999. */
+const seasonStart = (s: string) => {
+  const m = /^(\d{2})\/(\d{2})$/.exec(s);
+  if (!m) return null;
+  const a = Number(m[1]);
+  return a >= 50 ? 1900 + a : 2000 + a;
+};
+
+export function convertDcaribou(t: DcaribouTexts, now: Date): TmTexts {
+  const tierOf: Record<string, string> = {
+    first_tier: 'First Tier',
+    second_tier: 'Second Tier',
+    third_tier: 'Third Tier',
+  };
+  // competitions: only domestic leagues become league criteria
+  const comps = new Map<string, { name: string; tier: string }>();
+  let chk = true;
+  for (const r of csvRecords(t.competitions)) {
+    if (chk) need('competitions', r, ['competition_id', 'name', 'sub_type', 'type']);
+    chk = false;
+    const tier = tierOf[r.sub_type!];
+    if (r.type === 'domestic_league' && tier) comps.set(r.competition_id!, { name: r.name!, tier });
+  }
+  const clubName = new Map<string, string>();
+  chk = true;
+  for (const r of csvRecords(t.clubs)) {
+    if (chk) need('clubs', r, ['club_id', 'name']);
+    chk = false;
+    clubName.set(r.club_id!, r.name!);
+  }
+
+  // ---- league tables from games ----
+  const seen = new Set<string>();
+  const seasons = [
+    'club_id,competition_id,competition_name,season_id,season_league_level_level_name,team_name',
+  ];
+  chk = true;
+  for (const r of csvRecords(t.games)) {
+    if (chk)
+      need('games', r, [
+        'competition_id',
+        'season',
+        'home_club_id',
+        'away_club_id',
+        'home_club_name',
+      ]);
+    chk = false;
+    const c = comps.get(r.competition_id!);
+    if (!c) continue;
+    for (const [id, nm] of [
+      [r.home_club_id!, r.home_club_name!],
+      [r.away_club_id!, r.away_club_name!],
+    ] as const) {
+      const key = `${id}|${r.competition_id}|${r.season}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      seasons.push(row(id, r.competition_id, c.name, r.season, c.tier, clubName.get(id) ?? nm));
+    }
+  }
+
+  // ---- national teams ----
+  const nationalIds = new Set<string>();
+  chk = true;
+  for (const r of csvRecords(t.national_teams)) {
+    if (chk) need('national_teams', r, ['national_team_id']);
+    chk = false;
+    nationalIds.add(r.national_team_id!);
+  }
+  const caps = new Map<string, number>(); // `${player}|${team}` -> matches
+  chk = true;
+  for (const r of csvRecords(t.appearances)) {
+    if (chk) need('appearances', r, ['player_id', 'player_club_id']);
+    chk = false;
+    if (!nationalIds.has(r.player_club_id!)) continue;
+    const k = `${r.player_id}|${r.player_club_id}`;
+    caps.set(k, (caps.get(k) ?? 0) + 1);
+  }
+  const national = ['player_id,team_id,matches'];
+  for (const [k, n] of caps) {
+    const [p, tm] = k.split('|');
+    national.push(row(p, tm, n));
+  }
+
+  // ---- profiles + values ----
+  const profiles = [
+    'player_id,player_name,date_of_birth,citizenship,main_position,current_club_id,on_loan_from_club_id,date_of_death',
+  ];
+  const values = ['player_id,date_unix,value'];
+  chk = true;
+  for (const r of csvRecords(t.players)) {
+    if (chk)
+      need('players', r, [
+        'player_id',
+        'name',
+        'date_of_birth',
+        'country_of_citizenship',
+        'position',
+      ]);
+    chk = false;
+    profiles.push(
+      row(
+        r.player_id,
+        r.name,
+        r.date_of_birth,
+        r.country_of_citizenship,
+        r.position,
+        r.current_club_id,
+      ),
+    );
+    if (r.highest_market_value_in_eur)
+      values.push(row(r.player_id, '2000-01-01', r.highest_market_value_in_eur));
+  }
+
+  // ---- transfers ----
+  const horizon = now.getTime() + 120 * 86_400_000;
+  const transfers = [
+    'player_id,transfer_date,from_team_id,from_team_name,to_team_id,to_team_name,transfer_fee',
+  ];
+  chk = true;
+  for (const r of csvRecords(t.transfers)) {
+    if (chk)
+      need('transfers', r, [
+        'player_id',
+        'transfer_date',
+        'from_club_id',
+        'to_club_id',
+        'transfer_season',
+      ]);
+    chk = false;
+    let date = r.transfer_date!.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (Date.parse(date) > horizon) {
+      // contract-end placeholders (e.g. 2030-06-30): use the stated season's start instead
+      const y = seasonStart(r.transfer_season ?? '');
+      if (y === null) continue;
+      date = `${y}-07-01`;
+    }
+    transfers.push(
+      row(
+        r.player_id,
+        date,
+        r.from_club_id,
+        r.from_club_name,
+        r.to_club_id,
+        r.to_club_name,
+        r.transfer_fee,
+      ),
+    );
+  }
+
+  return {
+    profiles: profiles.join('\n'),
+    transfers: transfers.join('\n'),
+    national: national.join('\n'),
+    seasons: seasons.join('\n'),
+    children: 'parent_team_id,child_team_id\n',
+    values: values.join('\n'),
+  };
+}
+
+export function buildDcaribouDataset(t: DcaribouTexts, generatedAt: string): Dataset {
+  const ds = buildTransfermarktDataset(convertDcaribou(t, new Date(generatedAt)), generatedAt);
+  return {
+    ...ds,
+    meta: {
+      ...ds.meta,
+      label: 'Transfermarkt player-scores (dcaribou)',
+      license:
+        'CC0 1.0 (dcaribou/transfermarkt-datasets). The data was scraped from Transfermarkt; its terms of use are a residual risk for commercial publication.',
+      attribution: 'dcaribou/transfermarkt-datasets (CC0), derived from Transfermarkt.',
+      notes:
+        'Club careers from transfer records; leagues from per-season games; national teams from caps counted in appearances. Youth/reserve sides are excluded.',
+    },
+  };
+}
+
+export interface DcaribouOptions {
+  /** Folder with the extracted Kaggle files (players.csv, transfers.csv, …). */
+  dir: string;
+  now?: () => Date;
+}
+
+export function dcaribouProvider(opts: DcaribouOptions): FootballProvider {
+  return {
+    sourceId: 'dcaribou',
+    label: 'Transfermarkt player-scores (dcaribou, CC0)',
+    kind: 'live',
+    async fetchDataset(ctx: ProviderContext): Promise<Dataset> {
+      const texts = {} as DcaribouTexts;
+      for (const name of DCARIBOU_FILES) {
+        const file = path.join(opts.dir, `${name}.csv`);
+        if (!fs.existsSync(file))
+          throw new Error(
+            `dcaribou: ${file} not found. Download https://www.kaggle.com/datasets/davidcariboo/player-scores and set DCARIBOU_DIR to the extracted folder.`,
+          );
+        texts[name] = fs.readFileSync(file, 'utf8');
+      }
+      ctx.log.info('dcaribou: building dataset');
+      return buildDcaribouDataset(texts, (opts.now ?? (() => new Date()))().toISOString());
+    },
+  };
+}

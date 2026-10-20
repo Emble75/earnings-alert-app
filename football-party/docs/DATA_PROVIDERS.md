@@ -13,6 +13,18 @@ Research was done on 2026-10-19 from this build environment. **Official provider
 | football-data.org            | Competitions/teams/squads; free tier reported as current-season only, 12 competitions         | Free: 10 req/min; paid plans from ~€12/mo (reported)                                          | Sources disagree on whether the free tier includes player data. Not suitable for history. |
 | Sportmonks                   | Teams, squads, players, transfers                                                             | League-based plans from ~€29/mo; free plan covers 2 leagues (reported)                        | Terms/logo rights not verified.                                                           |
 
+## Update 4: `dcaribou` (CC0 — the publishable option)
+
+`server/football/providers/dcaribou.ts` reads the Kaggle dataset [davidcariboo/player-scores](https://www.kaggle.com/datasets/davidcariboo/player-scores) (repo `dcaribou/transfermarkt-datasets`, **CC0**). It converts the tables to the shape of the Transfermarkt builder: careers from `transfers.csv`, season-exact leagues from `games.csv`, national-team caps counted from `appearances.csv`.
+
+```
+pip install kagglehub && python -c 'import kagglehub;print(kagglehub.dataset_download("davidcariboo/player-scores"))'
+DCARIBOU_DIR=<that folder> FOOTBALL_PROVIDER=dcaribou npm run sync
+npm run data:report -- --source dcaribou
+```
+
+Residual risk: the data was scraped from Transfermarkt, whose terms are separate from the CC0 licence — get legal advice before commercial use. Not live-tested in the build sandbox (Kaggle is blocked there); covered by a fixture test using the real column names.
+
 ## Update 3: `transfermarkt` (best free source, data up to Aug 2025)
 
 `server/football/providers/transfermarkt.ts` builds the dataset from the Transfermarkt scrape published as [salimt/football-datasets](https://github.com/salimt/football-datasets) (profiles, dated transfer history, national-team caps, league tables per club and season, market values). Reep (withqwerty/reep) was evaluated and rejected: it is an ID crosswalk, not career data.

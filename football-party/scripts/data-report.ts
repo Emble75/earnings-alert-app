@@ -10,7 +10,7 @@ import { seededRng } from '../shared/util/rng';
 
 /**
  * Data quality report for one stored source.
- * Usage: npm run data:report [-- --source statsbomb|sample|wikidata|import]
+ * Usage: npm run data:report [-- --source transfermarkt|dcaribou|opendata|statsbomb|sample]
  * Prints coverage, spot-checks against well-known facts, and whether playable grids can be built.
  */
 loadDotEnv();
