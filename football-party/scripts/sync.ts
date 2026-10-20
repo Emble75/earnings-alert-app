@@ -6,7 +6,7 @@ import { migrate } from '../server/db/migrate';
 import { FootballService } from '../server/football/sync';
 
 /**
- * Usage: npm run sync [-- --provider sample|wikidata|file] [--file path.json]
+ * Usage: npm run sync [-- --provider sample|dcaribou|file] [--file path.json]
  * Runs one synchronous sync of the chosen provider into the configured database.
  */
 loadDotEnv();

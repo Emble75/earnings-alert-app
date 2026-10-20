@@ -13,6 +13,10 @@ Research was done on 2026-10-19 from this build environment. **Official provider
 | football-data.org            | Competitions/teams/squads; free tier reported as current-season only, 12 competitions         | Free: 10 req/min; paid plans from ~€12/mo (reported)                                          | Sources disagree on whether the free tier includes player data. Not suitable for history. |
 | Sportmonks                   | Teams, squads, players, transfers                                                             | League-based plans from ~€29/mo; free plan covers 2 leagues (reported)                        | Terms/logo rights not verified.                                                           |
 
+## Update 5: your own frozen dataset (`data:export`)
+
+Once a sync looks right (`data:report`), freeze it: `npm run data:export -- --source dcaribou` writes `data/pitchside-dataset.json.gz` plus a manifest with licence/attribution. Deploy with `FOOTBALL_PROVIDER=file FOOTBALL_IMPORT_FILE=data/pitchside-dataset.json.gz`: no scraping or third-party calls at runtime, every deploy serves the exact data you reviewed, and you update it deliberately by re-running sync + export. A snapshot does not change the licence of its sources — it inherits the terms of whatever went in.
+
 ## Update 4: `dcaribou` (CC0 — the publishable option)
 
 `server/football/providers/dcaribou.ts` reads the Kaggle dataset [davidcariboo/player-scores](https://www.kaggle.com/datasets/davidcariboo/player-scores) (repo `dcaribou/transfermarkt-datasets`, **CC0**). It converts the tables to the shape of the Transfermarkt builder: careers from `transfers.csv`, season-exact leagues from `games.csv`, national-team caps counted from `appearances.csv`.

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { DatasetSchema } from '../../../shared/football/types';
 import type { FootballProvider } from './types';
 
@@ -12,7 +13,8 @@ export function fileProvider(path: string): FootballProvider {
     label: 'File import',
     kind: 'import',
     async fetchDataset() {
-      const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
+      const buf = fs.readFileSync(path);
+      const raw = JSON.parse((path.endsWith('.gz') ? gunzipSync(buf) : buf).toString('utf8'));
       const ds = DatasetSchema.parse(raw);
       return { ...ds, meta: { ...ds.meta, sourceId: 'import', kind: 'import' } };
     },
