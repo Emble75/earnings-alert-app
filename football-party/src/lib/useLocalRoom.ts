@@ -92,6 +92,9 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
   const [, bump] = useState(0);
   const [epoch, setEpoch] = useState(0);
   const roomRef = useRef<Room | null>(null);
+  // Game clock = wall clock minus time spent paused (ad breaks), so timers don't run during an ad.
+  const skew = useRef(0);
+  const paused = useRef(false);
   const rng = useMemo(() => randomRng(), []);
   const setupKey = setup ? JSON.stringify(setup) : '';
 
@@ -107,7 +110,7 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
   }, []);
 
   const env = useCallback(
-    (): RoomEnv => ({ now: Date.now(), rng, football: football! }),
+    (): RoomEnv => ({ now: Date.now() - skew.current, rng, football: football! }),
     [football, rng],
   );
 
@@ -146,7 +149,7 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
     if (!setup || !football) return;
     const id = setInterval(() => {
       const room = roomRef.current;
-      if (!room) return;
+      if (!room || paused.current) return;
       const before = room.version;
       tickRoom(room, env());
       if (room.version !== before) bump((n) => n + 1);
@@ -158,7 +161,7 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
   useEffect(() => {
     if (!setup || setup.game !== 'tictactoe' || setup.opponent !== 'bot' || !room || !football)
       return;
-    if (room.status !== 'playing' || !room.game) return;
+    if (room.status !== 'playing' || !room.game || paused.current) return;
     const s = room.game.state as TttState;
     if (s.phase !== 'playing') return;
     const side = (s.firstSide + s.turn) % 2;
@@ -208,6 +211,18 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
     [env, setup],
   );
 
+  const pauseWhile = useCallback(async (p: Promise<unknown>) => {
+    const start = Date.now();
+    paused.current = true;
+    try {
+      await p;
+    } finally {
+      skew.current += Date.now() - start;
+      paused.current = false;
+      bump((n) => n + 1);
+    }
+  }, []);
+
   const names = Object.fromEntries((room?.players ?? []).map((p) => [p.id, p.name]));
   const actingId = room && setup ? actingPlayer(room, setup) : null;
   const searchPlayers = useCallback(
@@ -218,7 +233,15 @@ export function useLocalRoom(setup: LocalSetup | null): LocalRoom {
   const view: RoomView | null =
     room && football && actingId ? buildRoomView(room, actingId, env()) : null;
   const controller: RoomController | null = view
-    ? { mode: 'local', view, clockOffset: 0, send, searchPlayers, actingAs: actingId ?? undefined }
+    ? {
+        mode: 'local',
+        view,
+        clockOffset: -skew.current,
+        send,
+        searchPlayers,
+        actingAs: actingId ?? undefined,
+        pauseWhile,
+      }
     : null;
 
   return { controller, error, actingId, names, restart: () => setEpoch((n) => n + 1) };

@@ -5,6 +5,19 @@ const EnvSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   NODE_ENV: z.string().default('development'),
   PUBLIC_ORIGIN: z.string().optional(),
+  /** Google AdSense publisher id ("ca-pub-1234567890123456"). Unset = no ads, no ad scripts, no consent banner. */
+  ADS_CLIENT: z
+    .string()
+    .regex(/^ca-pub-\d{8,20}$/)
+    .optional(),
+  ADS_BANNER_SLOT: z
+    .string()
+    .regex(/^\d{4,20}$/)
+    .optional(),
+  /** Imprint data (Impressum) — shown on /impressum. */
+  LEGAL_NAME: z.string().optional(),
+  LEGAL_ADDRESS: z.string().optional(),
+  LEGAL_EMAIL: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   DB_MODE: z.string().optional(),
   PGLITE_DIR: z.string().default('.data/pglite'),

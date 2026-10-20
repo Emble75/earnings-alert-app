@@ -5,6 +5,8 @@ import { ToastProvider } from '@/ui/kit';
 import { Landing } from '@/screens/Landing';
 import { Play } from '@/screens/Play';
 import { DataPolicy, Rules } from '@/screens/Info';
+import { Impressum, Privacy } from '@/screens/Legal';
+import { ConsentBanner } from '@/ui/Ads';
 import { CenterMessage, Page } from '@/screens/Shell';
 
 // Rare screens are split out so first load stays small.
@@ -58,11 +60,14 @@ export default function App() {
             <Route path="/practice/:game" element={<LegacyPractice />} />
             <Route path="/rules" element={<Rules />} />
             <Route path="/data" element={<DataPolicy />} />
+            <Route path="/impressum" element={<Impressum />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        <ConsentBanner />
       </ToastProvider>
     </ErrorBoundary>
   );

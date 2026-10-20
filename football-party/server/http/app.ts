@@ -30,22 +30,52 @@ const NameBody = z.object({
   profileToken: z.string().max(100).optional(),
 });
 
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "connect-src 'self' ws: wss:",
-  "manifest-src 'self'",
-  "worker-src 'self'",
-  "base-uri 'none'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join('; ');
+const GOOGLE_ADS = [
+  'https://pagead2.googlesyndication.com',
+  'https://*.googlesyndication.com',
+  'https://*.google.com',
+  'https://*.doubleclick.net',
+  'https://*.adtrafficquality.google',
+  'https://www.googletagservices.com',
+];
+
+/** Strict by default; widened for Google's ad domains only when ads are configured. */
+export function buildCsp(ads: boolean) {
+  const g = ads ? ` ${GOOGLE_ADS.join(' ')}` : '';
+  return [
+    "default-src 'self'",
+    `script-src 'self'${g}`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data:${ads ? ' https:' : ''}`,
+    "font-src 'self'",
+    `connect-src 'self' ws: wss:${g}`,
+    ads ? `frame-src ${GOOGLE_ADS.join(' ')}` : "frame-src 'none'",
+    "manifest-src 'self'",
+    "worker-src 'self'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
+
+/** Social previews need absolute URLs, which only the server knows (PUBLIC_ORIGIN). */
+function withSocialTags(html: string, origin: string) {
+  if (!origin) return html;
+  const tags = [
+    `<link rel="canonical" href="${origin}/" />`,
+    `<meta property="og:url" content="${origin}/" />`,
+    `<meta property="og:image" content="${origin}/og.png" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:image" content="${origin}/og.png" />`,
+  ].join('\n    ');
+  return html.replace('</head>', `    ${tags}\n  </head>`);
+}
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { config, log, football, rooms, profiles } = deps;
+  const csp = buildCsp(!!config.ADS_CLIENT);
   const app = Fastify({
     logger: false,
     trustProxy: config.NODE_ENV === 'production',
@@ -75,7 +105,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Referrer-Policy', 'no-referrer');
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    if (!req.url.startsWith('/api/')) reply.header('Content-Security-Policy', CSP);
+    if (!req.url.startsWith('/api/')) reply.header('Content-Security-Policy', csp);
     else reply.header('Cache-Control', reply.getHeader('Cache-Control') ?? 'no-store');
     return payload;
   });
@@ -212,6 +242,41 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return { run, status: await football.adminStatus() };
   });
 
+  // ---- Public site config, crawler files -----------------------------------------------------
+  const origin = (config.PUBLIC_ORIGIN ?? '').replace(/\/$/, '');
+  app.get('/api/site', async () => ({
+    ads: config.ADS_CLIENT
+      ? { client: config.ADS_CLIENT, bannerSlot: config.ADS_BANNER_SLOT ?? null }
+      : null,
+    legal: {
+      name: config.LEGAL_NAME ?? null,
+      address: config.LEGAL_ADDRESS ?? null,
+      email: config.LEGAL_EMAIL ?? null,
+    },
+  }));
+  app.get('/robots.txt', async (_req, reply) =>
+    reply
+      .type('text/plain')
+      .send(
+        `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\n${origin ? `Sitemap: ${origin}/sitemap.xml\n` : ''}`,
+      ),
+  );
+  app.get('/sitemap.xml', async (_req, reply) => {
+    const paths = ['/', '/rules', '/data', '/play', '/party', '/impressum', '/privacy'];
+    return reply
+      .type('application/xml')
+      .send(
+        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${paths.map((p) => `  <url><loc>${origin}${p}</loc></url>`).join('\n')}\n</urlset>\n`,
+      );
+  });
+  app.get('/ads.txt', async (_req, reply) =>
+    config.ADS_CLIENT
+      ? reply
+          .type('text/plain')
+          .send(`google.com, ${config.ADS_CLIENT.replace('ca-', '')}, DIRECT, f08c47fec0942fa0\n`)
+      : reply.code(404).type('text/plain').send('Not found\n'),
+  );
+
   // ---- Static client ------------------------------------------------------------------------
   const dist = path.resolve(process.cwd(), 'dist');
   const serve =
@@ -240,7 +305,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       return reply
         .header('Cache-Control', 'no-cache')
         .type('text/html')
-        .send(fs.readFileSync(path.join(dist, 'index.html')));
+        .send(withSocialTags(fs.readFileSync(path.join(dist, 'index.html'), 'utf8'), origin));
     });
   } else {
     app.get('/', async () => ({

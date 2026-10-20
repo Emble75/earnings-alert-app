@@ -46,7 +46,7 @@ async function joinRoom(page: Page, code: string, name: string) {
 test('landing explains the product and links into play', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/pick a game/i);
-  await expect(page.getByText(/sample/i).first()).toBeVisible();
+  await expect(page.getByText(/never guesses/i)).toBeVisible();
   await page
     .getByRole('link', { name: /online/i })
     .first()
@@ -359,4 +359,13 @@ test('one-phone Career Path shows a club trail', async ({ page }) => {
   await page.goto('/party/career');
   await page.getByRole('button', { name: /kick off/i }).click();
   await expect(page.getByLabel(/career, oldest club first/i)).toBeVisible();
+});
+
+test('legal pages exist, and no ad consent banner appears while ads are off', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('dialog', { name: /advertising/i })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Impressum' }).click();
+  await expect(page.getByRole('heading', { name: 'Impressum' })).toBeVisible();
+  await page.getByRole('link', { name: 'Datenschutz' }).click();
+  await expect(page.getByRole('heading', { name: 'Datenschutzerklärung' })).toBeVisible();
 });

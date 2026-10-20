@@ -52,8 +52,8 @@ export function Landing() {
       </section>
 
       <p className="home-note">
-        Only confirmed records count — if the data can’t prove it, the game never guesses. The
-        built-in set is a small <strong>sample</strong>. <Link to="/data">How the data works</Link>
+        Only confirmed records count — if the data can’t prove it, the game never guesses.{' '}
+        <Link to="/data">How the data works</Link>
       </p>
     </Page>
   );

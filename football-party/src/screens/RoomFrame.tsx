@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Copy, LogOut, Share2, Users, Wifi, WifiOff } from 'lucide-react';
 import { clientGames } from '@/games/registry';
@@ -6,6 +6,8 @@ import { seats } from '@/lib/storage';
 import type { RoomController } from '@/lib/room-controller';
 import type { ConnStatus } from '@/lib/useRoomConnection';
 import { Button, IconButton, Sheet, useToast } from '@/ui/kit';
+import { AdBanner } from '@/ui/Ads';
+import { showBreak } from '@/lib/ads';
 import { Footer, Header } from './Shell';
 import { Lobby } from './Lobby';
 
@@ -32,6 +34,23 @@ export function RoomFrame({
   const toast = useToast();
   const [leaving, setLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Ad breaks only at natural pauses: one phone → before every third, fifth… round (i.e. after every
+  // second round); online → once when the game ends. The clock stops while an ad is shown.
+  const round = (view.game?.view as { round?: number } | undefined)?.round ?? 0;
+  const prevRound = useRef(round);
+  useEffect(() => {
+    const before = prevRound.current;
+    prevRound.current = round;
+    if (local && round > before && before > 0 && before % 2 === 0)
+      void ctl.pauseWhile?.(showBreak('round-break'));
+  }, [round, local, ctl]);
+  const prevStatus = useRef(view.status);
+  useEffect(() => {
+    if (!local && prevStatus.current !== 'finished' && view.status === 'finished')
+      void showBreak('game-end');
+    prevStatus.current = view.status;
+  }, [view.status, local]);
 
   // Local practice has no lobby: finishing "back to lobby" returns to setup.
   useEffect(() => {
@@ -128,6 +147,7 @@ export function RoomFrame({
           </p>
         )}
         {view.status === 'lobby' || !Screen ? <Lobby ctl={ctl} /> : <Screen ctl={ctl} />}
+        <AdBanner />
       </main>
       <Footer />
 

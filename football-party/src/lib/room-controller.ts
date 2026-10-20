@@ -15,4 +15,6 @@ export interface RoomController {
   searchPlayers: (q: string, signal?: AbortSignal) => Promise<PlayerCard[]>;
   /** Local pass-and-play only: who the device is currently acting as. */
   actingAs?: string;
+  /** Local only: stops the game clock while `p` runs (used for ad breaks). */
+  pauseWhile?: (p: Promise<unknown>) => Promise<void>;
 }

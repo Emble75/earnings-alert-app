@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Crown, RotateCcw, Trophy, Undo2 } from 'lucide-react';
+import { Crown, RotateCcw, Share2, Trophy, Undo2 } from 'lucide-react';
 import type { RoomView } from '@shared/room/types';
 import { fmtClock, useCountdown } from '@/lib/clock';
 import type { RoomController } from '@/lib/room-controller';
@@ -151,6 +151,7 @@ export function FinalPanel({
 }) {
   const { view } = ctl;
   const act = useAct(ctl);
+  const toast = useToast();
   const isHost = view.hostId === view.you || ctl.mode === 'local';
   const rows: StandingRow[] = Object.keys(scores).map((id) => ({
     id,
@@ -183,6 +184,31 @@ export function FinalPanel({
         </p>
       )}
       <div className="row wrap" style={{ marginTop: 'var(--s-5)' }}>
+        <Button
+          variant="secondary"
+          size="lg"
+          onClick={async () => {
+            const mine = scores[view.you];
+            const text = `${mine !== undefined ? `I scored ${mine} in` : 'We just played'} Pitchside — football party games. Can you beat that?`;
+            const url = location.origin + '/';
+            if (typeof navigator.share === 'function') {
+              try {
+                await navigator.share({ title: 'Pitchside', text, url });
+                return;
+              } catch {
+                /* dismissed */
+              }
+            }
+            try {
+              await navigator.clipboard.writeText(`${text} ${url}`);
+              toast('Link copied', 'info');
+            } catch {
+              toast(`${text} ${url}`, 'info');
+            }
+          }}
+        >
+          <Share2 aria-hidden size={20} /> Share
+        </Button>
         {isHost ? (
           <>
             <Button

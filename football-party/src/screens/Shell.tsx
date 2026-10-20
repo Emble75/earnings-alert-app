@@ -3,6 +3,9 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Settings, Vibrate, Volume2, Waves } from 'lucide-react';
 import { cue, setPref, usePrefs } from '@/lib/prefs';
 import { Button, IconButton, Logo, Sheet } from '@/ui/kit';
+import { AdBanner } from '@/ui/Ads';
+import { setConsent } from '@/lib/consent';
+import { useSite } from '@/lib/site';
 
 export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const prefs = usePrefs();
@@ -92,6 +95,16 @@ export function Header({ children }: { children?: ReactNode }) {
   );
 }
 
+function AdSettings() {
+  const { ads } = useSite();
+  if (!ads) return null;
+  return (
+    <button type="button" className="link-btn" onClick={() => setConsent(null)}>
+      Ad settings
+    </button>
+  );
+}
+
 export function Footer() {
   return (
     <footer className="site-footer">
@@ -104,6 +117,9 @@ export function Footer() {
         </span>
         <span className="row" style={{ gap: 'var(--s-4)' }}>
           <Link to="/rules">Rules</Link>
+          <Link to="/impressum">Impressum</Link>
+          <Link to="/privacy">Datenschutz</Link>
+          <AdSettings />
           <Link to="/data">Data &amp; rights</Link>
           <Link to="/profile">Profile</Link>
         </span>
@@ -120,6 +136,7 @@ export function Page({ children, narrow }: { children: ReactNode; narrow?: boole
       <Header />
       <main id="main" tabIndex={-1} className={narrow ? 'container narrow' : 'container'}>
         {children}
+        <AdBanner />
       </main>
       <Footer />
     </>
