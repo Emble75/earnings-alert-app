@@ -120,3 +120,37 @@ const NAMES = [
 const SET = new Set(NAMES.map(canon));
 
 export const isProminentClub = (name: string) => SET.has(canon(name));
+
+const LEAGUES = new Set(
+  [
+    'Premier League',
+    'La Liga',
+    'LaLiga',
+    'Primera Division',
+    'Bundesliga',
+    'Serie A',
+    'Ligue 1',
+    'Eredivisie',
+    'Primeira Liga',
+    'Liga Portugal',
+    'Super Lig',
+    'Championship',
+    'Serie B',
+    'Scottish Premiership',
+    'Major League Soccer',
+    'MLS',
+    'Jupiler Pro League',
+    'Campeonato Brasileiro Serie A',
+    'Brasileirao',
+    'Liga Profesional',
+    'Saudi Pro League',
+    'Austrian Bundesliga',
+    'Super League',
+    'Ekstraklasa',
+    'Premier Liga',
+    'Liga MX',
+    'Superliga',
+  ].map(normalizeText),
+);
+/** Top competitions a casual fan knows; steers Easy/Medium grids away from obscure leagues. */
+export const isProminentLeague = (name: string) => LEAGUES.has(normalizeText(name));

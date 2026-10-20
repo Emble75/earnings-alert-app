@@ -1,6 +1,6 @@
 import { shuffle, type Rng } from '../util/rng';
 import { normalizeText } from './normalize';
-import { isProminentClub } from './prominence';
+import { isProminentClub, isProminentLeague } from './prominence';
 import { famousRank } from './famous';
 import type {
   Affiliation,
@@ -298,6 +298,7 @@ export class FootballIndex {
       // Nations are far larger than clubs in World-Cup-based data; scale the bar so Easy/Medium favour big nations.
       if (set.size < (c.type === 'national' ? minMembers * 2 : minMembers)) return;
       if (clubsMustBeProminent && c.type === 'club' && !isProminentClub(c.label)) return;
+      if (clubsMustBeProminent && c.type === 'league' && !isProminentLeague(c.label)) return;
       if (minFamous > 0) {
         // Prominence of a criterion = weighted count of its well-known players (tier 1 counts 5x).
         let score = 0;
@@ -400,7 +401,7 @@ export class FootballIndex {
   private leagueForCategory(category: ImpostorCategory): Criterion | null {
     const names: Partial<Record<ImpostorCategory, string[]>> = {
       'premier-league': ['premier league'],
-      'la-liga': ['la liga', 'primera division'],
+      'la-liga': ['la liga', 'laliga', 'primera division'],
       'serie-a': ['serie a'],
       bundesliga: ['bundesliga', '1 bundesliga'],
       'ligue-1': ['ligue 1'],

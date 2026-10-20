@@ -93,7 +93,7 @@ const checks: Check[] = [
   { player: 'Romelu Lukaku', kind: 'club', target: 'Inter Milan|Inter', expect: true },
   { player: 'Romelu Lukaku', kind: 'club', target: 'Manchester United|Man Utd', expect: true },
   { player: 'Harry Kane', kind: 'club', target: 'Tottenham Hotspur|Spurs', expect: true },
-  { player: 'Harry Kane', kind: 'club', target: 'Bayern Munich', expect: false },
+  { player: 'Harry Kane', kind: 'club', target: 'Real Madrid', expect: false },
   { player: 'Sergio Agüero', kind: 'club', target: 'Manchester City|Man City', expect: true },
   {
     player: 'Sergio Agüero',
@@ -121,7 +121,11 @@ if (fs.existsSync('data/golden-facts.json'))
   checks.push(...(JSON.parse(fs.readFileSync('data/golden-facts.json', 'utf8')).facts as Check[]));
 const findTeam = (names: string, kind: 'club' | 'national') => {
   for (const n of names.split('|')) {
-    const t = ds.teams.find((x) => x.kind === kind && normalizeText(x.name) === normalizeText(n));
+    const t = ds.teams.find(
+      (x) =>
+        x.kind === kind &&
+        [x.name, ...x.aliases].some((a) => normalizeText(a) === normalizeText(n)),
+    );
     if (t) return t;
   }
   return undefined;
@@ -131,7 +135,9 @@ const findLeague = (names: string) =>
     .split('|')
     .map((n) =>
       ds.competitions.find(
-        (c) => c.kind === 'league' && normalizeText(c.name) === normalizeText(n),
+        (c) =>
+          c.kind === 'league' &&
+          [c.name, ...c.aliases].some((a) => normalizeText(a) === normalizeText(n)),
       ),
     )
     .find(Boolean);

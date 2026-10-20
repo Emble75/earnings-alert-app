@@ -15,6 +15,7 @@ import { fileProvider } from './providers/file';
 import { wikidataProvider } from './providers/wikidata';
 import { statsbombProvider } from './providers/statsbomb';
 import { openDataProvider } from './providers/opendata';
+import { transfermarktProvider } from './providers/transfermarkt';
 
 export interface Conflict {
   entityType: string;
@@ -138,6 +139,11 @@ const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v)
 
 export function createProvider(config: Config): FootballProvider {
   switch (config.FOOTBALL_PROVIDER) {
+    case 'transfermarkt':
+      return transfermarktProvider({
+        cacheDir: config.TRANSFERMARKT_CACHE_DIR,
+        localDir: config.TRANSFERMARKT_LOCAL_DIR,
+      });
     case 'opendata':
       return openDataProvider({ cacheDir: config.OPENDATA_CACHE_DIR });
     case 'statsbomb':

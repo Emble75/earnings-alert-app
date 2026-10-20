@@ -10,6 +10,8 @@ Mobile-first, installable (PWA) party games for friends: open a link, make or jo
 
 > **Impostor only uses famous footballers:** the default is the Top 100 (a curated list in `shared/football/famous.ts` plus a computed fame score), with Top 250 / Top 400 and a league filter available. After updating, re-run `npm run sync -- --provider opendata` once so the fame scores are stored.
 
+> **Best data (private use):** `npm run sync -- --provider transfermarkt` — ~85,000 players, 214 competitions, data to Aug 2025 (see docs/DATA_PROVIDERS.md, Update 3).
+
 > **Data honesty.** The default dataset is a small **hand-curated sample** (97 players, 20 clubs, snapshot 2024-25), labelled "sample" everywhere. For **broad real data** (~39,000 players, 9 European leagues 1992–2022, World Cup squads) run `npm run sync -- --provider opendata` (private/testing use — see licence notes in docs/DATA_PROVIDERS.md). For a smaller, cleanly verified set run `npm run sync -- --provider statsbomb` (StatsBomb Open Data: ~6,800 players, verified from match lineups, partial coverage) — see [docs/TEST_WITH_REAL_DATA.md](docs/TEST_WITH_REAL_DATA.md) and [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md).
 
 ## Quick start

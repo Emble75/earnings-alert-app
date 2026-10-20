@@ -13,6 +13,18 @@ Research was done on 2026-10-19 from this build environment. **Official provider
 | football-data.org            | Competitions/teams/squads; free tier reported as current-season only, 12 competitions         | Free: 10 req/min; paid plans from ~€12/mo (reported)                                          | Sources disagree on whether the free tier includes player data. Not suitable for history. |
 | Sportmonks                   | Teams, squads, players, transfers                                                             | League-based plans from ~€29/mo; free plan covers 2 leagues (reported)                        | Terms/logo rights not verified.                                                           |
 
+## Update 3: `transfermarkt` (best free source, data up to Aug 2025)
+
+`server/football/providers/transfermarkt.ts` builds the dataset from the Transfermarkt scrape published as [salimt/football-datasets](https://github.com/salimt/football-datasets) (profiles, dated transfer history, national-team caps, league tables per club and season, market values). Reep (withqwerty/reep) was evaluated and rejected: it is an ID crosswalk, not career data.
+
+- Club spells come from transfer dates (June joins count for the new season); open spells at the current club stay open; youth/reserve sides and "Retired / Without club" are ignored.
+- Leagues come from per-season league tables, so "played in the Bundesliga" is season-exact (Lucas Vázquez at Leverkusen 2025 counts; Jorge Meré at Köln counts, Spain correctly does not).
+- Nations require actual senior caps; fame = market value + caps.
+- Last live sync: **85,237 players · 11,595 clubs · 214 competitions · 579,100 dated affiliations**; 47/47 spot checks correct, 0 wrong (`npm run data:report -- --source transfermarkt`). Party mode ships ~5.6 MB gzipped.
+- Licence: the repository carries no licence and its content derives from Transfermarkt → **private/testing use only**.
+
+Run: `FOOTBALL_PROVIDER=transfermarkt npm run sync` (downloads ~100 MB, one-time; set `TRANSFERMARKT_LOCAL_DIR` to use files you already have).
+
 ## Update 2: broad coverage via "opendata" (transfers + World Cup squads)
 
 StatsBomb alone misses most careers (e.g. Ashley Young at Premier League and Inter). `opendata` (`server/football/providers/opendata.ts`) combines two GitHub datasets, both fetched live in this environment:
