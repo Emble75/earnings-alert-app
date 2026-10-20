@@ -20,6 +20,7 @@
     "db:reset": "tsx scripts/db-reset.ts",
     "sync": "tsx scripts/sync.ts",
     "data:export": "tsx scripts/data-export.ts",
+    "data:player": "tsx scripts/data-player.ts",
     "data:report": "tsx scripts/data-report.ts",
     "data:validate": "tsx scripts/validate-data.ts",
     "icons": "node scripts/make-icons.mjs",
