@@ -25,6 +25,42 @@ export const DCARIBOU_FILES = [
 ] as const;
 export type DcaribouTexts = Record<(typeof DCARIBOU_FILES)[number], string>;
 
+/** competitions.csv names are slugs ("premier-league"); show proper names. */
+const PRETTY: Record<string, string> = {
+  GB1: 'Premier League',
+  GB2: 'Championship',
+  ES1: 'LaLiga',
+  ES2: 'LaLiga 2',
+  L1: 'Bundesliga',
+  L2: '2. Bundesliga',
+  IT1: 'Serie A',
+  IT2: 'Serie B',
+  FR1: 'Ligue 1',
+  FR2: 'Ligue 2',
+  NL1: 'Eredivisie',
+  PO1: 'Liga Portugal',
+  TR1: 'Süper Lig',
+  BE1: 'Jupiler Pro League',
+  SC1: 'Scottish Premiership',
+  MLS1: 'Major League Soccer',
+  BRA1: 'Brasileirão Série A',
+  AR1N: 'Liga Profesional',
+  A1: 'Austrian Bundesliga',
+  C1: 'Swiss Super League',
+  GR1: 'Super League Greece',
+  RU1: 'Russian Premier League',
+  UKR1: 'Ukrainian Premier League',
+  DK1: 'Danish Superliga',
+  NO1: 'Eliteserien',
+  SE1: 'Allsvenskan',
+  PL1: 'Ekstraklasa',
+  TS1: 'Czech First League',
+  KR1: 'Croatian HNL',
+  SER1: 'Serbian SuperLiga',
+};
+const titleCase = (slug: string) =>
+  slug.replace(/-/g, ' ').replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+
 const q = (s: string | undefined) => `"${(s ?? '').replace(/"/g, '""')}"`;
 const row = (...cols: (string | number | undefined)[]) =>
   cols.map((c) => q(String(c ?? ''))).join(',');
@@ -58,7 +94,11 @@ export function convertDcaribou(t: DcaribouTexts, now: Date, wd: WdSpell[] = [])
     if (chk) need('competitions', r, ['competition_id', 'name', 'sub_type', 'type']);
     chk = false;
     const tier = tierOf[r.sub_type!];
-    if (r.type === 'domestic_league' && tier) comps.set(r.competition_id!, { name: r.name!, tier });
+    if (r.type === 'domestic_league' && tier)
+      comps.set(r.competition_id!, {
+        name: PRETTY[r.competition_id!] ?? titleCase(r.name!),
+        tier,
+      });
   }
   const clubName = new Map<string, string>();
   chk = true;

@@ -144,6 +144,11 @@ const LEAGUES = new Set(
     'Liga Profesional',
     'Saudi Pro League',
     'Austrian Bundesliga',
+    'Swiss Super League',
+    'Russian Premier League',
+    'Danish Superliga',
+    'Eliteserien',
+    'Allsvenskan',
 
     'Ekstraklasa',
     'Liga MX',

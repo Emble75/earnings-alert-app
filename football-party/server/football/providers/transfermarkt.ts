@@ -58,7 +58,7 @@ export type TmTexts = Record<TmFileKey, string> & {
 const TERMINAL = /^(retired|without club|career break|unknown|ban|suspended|\?)$/i;
 /** Youth/reserve sides are not "clubs" for quiz purposes (Transfermarkt lists them as separate teams). */
 const YOUTH =
-  /(\bU-?\d{2}\b|\bunder[- ]?\d{2}\b|\byouth\b|\bjuniors?\b|\bjugend\b|\bprimavera\b|\bsub-?\d{2}\b|\bacademy\b|\bcadete\b|\bjuvenil\b|\bamateure?\b|\breserves?\b)/i;
+  /(\bU-?\d{2}\b|\bunder[- ]?\d{2}\b|\byouth\b|\bjuniors?\b|\bjugend\b|\bprimavera\b|\bsub-?\d{2}\b|\bacademy\b|\byth\b|\bcadete\b|\bjuvenil\b|\bamateure?\b|\breserves?\b)/i;
 
 const num = (s: string | undefined) => (s === undefined || s === '' ? NaN : Number(s));
 const slug = (s: string, max = 50) => normalizeText(s).replace(/ /g, '-').slice(0, max) || 'x';
