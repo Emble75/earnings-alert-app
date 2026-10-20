@@ -1,6 +1,20 @@
 import { shuffle, type Rng } from '../util/rng';
 import { normalizeText } from './normalize';
-import { isProminentClub, isProminentLeague } from './prominence';
+import {
+  isEasyClub,
+  isEasyLeague,
+  isEasyNation,
+  isMediumNation,
+  isProminentClub,
+  isProminentLeague,
+} from './prominence';
+
+interface Level {
+  allowed: (c: Criterion, size: number) => boolean;
+  minAnswers: number;
+  famousPerCell: number;
+  minMembers: number;
+}
 import { famousRank } from './famous';
 import type {
   Affiliation,
@@ -325,36 +339,71 @@ export class FootballIndex {
    * criteria. Returns null if even that is impossible: the game is then unplayable, never guessed.
    */
   generateGrid(rng: Rng, difficulty: Difficulty): GridSpec | null {
-    const minAnswers = DIFFICULTY_MIN_ANSWERS[difficulty];
-    const famousNeeded = { easy: 20, medium: 10, hard: 0 }[difficulty];
-    // Easy: only recognisable clubs. Medium: recognisable clubs or ones with many well-known players.
-    // Final pass relaxes everything so thin datasets still produce a (verified) grid.
-    // Large datasets contain thousands of tiny clubs: require a minimum squad-history size per criterion.
-    const big = { easy: 40, medium: 20, hard: 12 }[difficulty];
-    const passes: [number, boolean, number][] =
+    // Each level fixes WHICH criteria may appear (so Easy = famous leagues/clubs/nations only) and
+    // how many well-known players each cell needs. Levels fall back to the next looser one only when
+    // a (thin) dataset cannot support the strict one, so a grid is always verified.
+    const medClub = (c: Criterion) => isProminentClub(c.label) || isEasyClub(c.label);
+    const levels: Record<string, Level> = {
+      easy: {
+        allowed: (c) =>
+          c.type === 'league'
+            ? isEasyLeague(c.label)
+            : c.type === 'club'
+              ? isEasyClub(c.label)
+              : isEasyNation(c.label),
+        minAnswers: 3,
+        famousPerCell: 2,
+        minMembers: 40,
+      },
+      medium: {
+        allowed: (c) =>
+          c.type === 'league'
+            ? isProminentLeague(c.label)
+            : c.type === 'club'
+              ? medClub(c)
+              : isMediumNation(c.label),
+        minAnswers: 2,
+        famousPerCell: 1,
+        minMembers: 30,
+      },
+      hard: {
+        // Still recognisable-ish: big squads' worth of history, not village clubs.
+        allowed: (c, size) =>
+          c.type === 'club'
+            ? medClub(c) || size >= 200
+            : c.type === 'league'
+              ? size >= 400
+              : size >= 40,
+        minAnswers: 1,
+        famousPerCell: 0,
+        minMembers: 10,
+      },
+      any: { allowed: () => true, minAnswers: 1, famousPerCell: 0, minMembers: 2 },
+      // Thin datasets: any criteria, but keep the requested level's answer floor.
+      any3: { allowed: () => true, minAnswers: 3, famousPerCell: 0, minMembers: 2 },
+      any2: { allowed: () => true, minAnswers: 2, famousPerCell: 0, minMembers: 2 },
+    };
+    const order =
       difficulty === 'easy'
-        ? [
-            [0, true, big],
-            [famousNeeded, false, big],
-            [0, false, 2],
-          ]
+        ? ['easy', 'any3', 'medium', 'any2', 'any']
         : difficulty === 'medium'
-          ? [
-              [0, true, big],
-              [famousNeeded, false, big],
-              [0, false, 2],
-            ]
-          : [
-              [0, false, big],
-              [0, false, 2],
-            ];
-    for (const [minFamous, prominentOnly, minMembers] of passes) {
-      const pool = this.criteriaPool(minFamous, prominentOnly, minMembers);
+          ? ['medium', 'any2', 'any']
+          : ['hard', 'any'];
+    for (const name of order) {
+      const lv = levels[name]!;
+      const pool = this.criteriaPool(0, false, lv.minMembers).filter((c) =>
+        lv.allowed(c, this.playersFor(c).size),
+      );
       if (pool.length < 6) continue;
+      const fam = (a: Criterion, b: Criterion) =>
+        this.validAnswers(a, b).filter((id) => (this.players.get(id)?.tier ?? 3) <= 2).length;
       const ok = (a: Criterion, b: Criterion) =>
         !(a.type === b.type && a.id === b.id) &&
+        // two leagues or two nations make dull, near-empty cells
+        !(a.type === b.type && a.type !== 'club') &&
         !this.isTrivialPair(a, b) &&
-        this.validAnswers(a, b).length >= minAnswers;
+        this.validAnswers(a, b).length >= lv.minAnswers &&
+        fam(a, b) >= lv.famousPerCell;
       for (let attempt = 0; attempt < 300; attempt++) {
         // Constructive: add rows one at a time, always keeping >= 3 columns compatible with every row so far.
         const rows: Criterion[] = [];
